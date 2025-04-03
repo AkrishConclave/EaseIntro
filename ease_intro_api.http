@@ -1,0 +1,26 @@
+### Файл для запуска теста эндпоитов без необходимости
+### использования сторонних программ
+
+@ease_intro_api_HostAddress = http://localhost:5215
+
+### Получить все митинги
+GET http://localhost:5215/api/meets
+Accept: application/json
+
+### Получить митинг по ID
+GET http://localhost:5215/api/meets/ba417439-93a7-4ac1-bb50-e0bc78d5b80b
+Accept: application/json
+
+### Создать новый митинг
+POST http://localhost:5215/api/meets
+Content-Type: application/json
+
+{
+  "title": "string",
+  "date": "2025-04-02T19:56:14.749Z",
+  "location": "string",
+  "statusId": 2
+}
+
+### Удалить митинг
+DELETE http://localhost:5215/api/meets/ba417439-93a7-4ac1-bb50-e0bc78d5b80b
