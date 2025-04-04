@@ -10,6 +10,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<Meet> Meets { get; set; }
     public DbSet<MeetStatus> MeetStatus { get; set; }
     
+    public DbSet<Member> Member { get; set; }
+    
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<MeetStatus>().HasData(
@@ -18,5 +20,10 @@ public class ApplicationDbContext : DbContext
             new MeetStatus { Id = 3, Title = "Встреча завершена", Description = "Встреча завершена" },
             new MeetStatus { Id = 4, Title = "Встреча отменена", Description = "Встреча отменена" }
         );
+        
+        modelBuilder.Entity<Meet>()
+            .HasMany(m => m.Members)
+            .WithOne(m => m.Meet)
+            .HasForeignKey(m => m.MeetGuid);
     }
 }

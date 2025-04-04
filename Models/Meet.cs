@@ -25,4 +25,6 @@ public class Meet
 
     [Required]
     public virtual MeetStatus? Status { get; set; }  // Навигационное свойство
+    
+    public virtual ICollection<Member> Members { get; set; } = new List<Member>();
 }

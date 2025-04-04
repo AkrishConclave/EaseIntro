@@ -4,6 +4,7 @@ using ease_intro_api.Data;
 using ease_intro_api.DTOs;
 using ease_intro_api.Models;
 using ease_intro_api.DTOs.Meet;
+using ease_intro_api.DTOs.Member;
 
 namespace ease_intro_api.Controllers;
 
@@ -28,6 +29,7 @@ public class MeetsController : ControllerBase
         {
             var meets = await _context.Meets
                 .Include(m => m.Status)
+                .Include(m => m.Members) // Загружаем участников
                 .Select(m => new MeetResponseDto
                 {
                     Uid = m.Uid,
@@ -39,7 +41,14 @@ public class MeetsController : ControllerBase
                         Id = m.Status.Id,
                         Title = m.Status.Title,
                         Description = m.Status.Description
-                    }
+                    },
+                    Members = m.Members.Select(member => new MemberResponseDto
+                    {
+                        Id = member.Id,
+                        Name = member.Name,
+                        Companion = member.Companion,
+                        Contact = member.Contact
+                    }).ToList()
                 })
                 .ToListAsync();
 
@@ -51,6 +60,7 @@ public class MeetsController : ControllerBase
             return StatusCode(500, "Internal server error");
         }
     }
+
 
     // Получить один митинг по ID
     [HttpGet("{uid:guid}")]

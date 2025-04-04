@@ -1,3 +1,5 @@
+using ease_intro_api.DTOs.Member;
+
 namespace ease_intro_api.DTOs.Meet;
 
 public class MeetResponseDto
@@ -7,4 +9,5 @@ public class MeetResponseDto
     public DateTime Date { get; set; }
     public string? Location { get; set; }
     public MeetStatusDto? Status { get; set; }
+    public List<MemberResponseDto> Members { get; set; } = new();
 }
