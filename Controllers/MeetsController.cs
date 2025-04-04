@@ -72,6 +72,7 @@ public class MeetsController : ControllerBase
         {
             var meet = await _context.Meets
                 .Include(m => m.Status)
+                .Include(m => m.Members)
                 .FirstOrDefaultAsync(m => m.Uid == uid);
 
             if (meet == null)
@@ -88,7 +89,14 @@ public class MeetsController : ControllerBase
                     Id = meet.Status.Id,
                     Title = meet.Status.Title,
                     Description = meet.Status.Description
-                }
+                },
+                Members = meet.Members.Select(member => new MemberResponseDto
+                {
+                    Id = member.Id,
+                    Name = member.Name,
+                    Companion = member.Companion,
+                    Contact = member.Contact
+                }).ToList()
             });
         }
         catch (Exception ex)
@@ -113,6 +121,7 @@ public class MeetsController : ControllerBase
             if (!statusExists)
                 return BadRequest("Invalid StatusId");
 
+            // Создаем встречу
             var meet = new Meet
             {
                 Uid = Guid.NewGuid(),
@@ -125,8 +134,25 @@ public class MeetsController : ControllerBase
             _context.Meets.Add(meet);
             await _context.SaveChangesAsync();
 
+            // Добавляем участников, если они есть
+            if (meetDto.Members != null && meetDto.Members.Any())
+            {
+                var members = meetDto.Members.Select(m => new Member
+                {
+                    Name = m.Name,
+                    Companion = m.Companion,
+                    Contact = m.Contact,
+                    MeetGuid = meet.Uid // Привязываем участников к созданной встрече
+                }).ToList();
+
+                _context.Member.AddRange(members);
+                await _context.SaveChangesAsync();
+            }
+
+            // Загружаем созданную встречу с участниками
             var createdMeet = await _context.Meets
                 .Include(m => m.Status)
+                .Include(m => m.Members)
                 .FirstAsync(m => m.Uid == meet.Uid);
 
             return CreatedAtAction(nameof(GetMeet), 
@@ -142,7 +168,14 @@ public class MeetsController : ControllerBase
                         Id = createdMeet.Status.Id,
                         Title = createdMeet.Status.Title,
                         Description = createdMeet.Status.Description
-                    }
+                    },
+                    Members = createdMeet.Members.Select(member => new MemberResponseDto
+                    {
+                        Id = member.Id,
+                        Name = member.Name,
+                        Companion = member.Companion,
+                        Contact = member.Contact
+                    }).ToList()
                 });
         }
         catch (Exception ex)
@@ -151,6 +184,7 @@ public class MeetsController : ControllerBase
             return StatusCode(500, "Internal server error");
         }
     }
+
 
     // Обновить митинг
     [HttpPut("{uid:guid}")]

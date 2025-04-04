@@ -18,7 +18,22 @@ Content-Type: application/json
   "title": "string",
   "date": "2025-04-02T19:56:14.749Z",
   "location": "string",
-  "statusId": 2
+  "statusId": 1
+}
+
+### Создать новый митинг
+POST http://localhost:5215/api/meets
+Content-Type: application/json
+
+{
+  "title": "Деловая встреча",
+  "date": "2024-04-02T12:00:00Z",
+  "location": "Москва",
+  "statusId": 1,
+  "members": [
+    { "name": "Иван Иванов", "companion": "Иван Иванов", "contact": "ivan@example.com" },
+    { "name": "Мария Петрова", "companion": "Иван Иванов", "contact": "maria@example.com" }
+  ]
 }
 
 ### Удалить митинг
