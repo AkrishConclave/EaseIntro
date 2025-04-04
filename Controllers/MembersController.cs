@@ -5,6 +5,7 @@ using ease_intro_api.Data;
 using ease_intro_api.DTOs;
 using ease_intro_api.DTOs.Meet;
 using ease_intro_api.DTOs.Member;
+using QRCoder;
 
 namespace ease_intro_api.Controllers;
 
@@ -133,12 +134,15 @@ public class MembersController : ControllerBase
                 return BadRequest("Meet not found");
             }
 
+            var timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+            
             var member = new Member
             {
                 Name = dto.Name,
                 Companion = dto.Companion,
                 Contact = dto.Contact,
-                MeetGuid = dto.MeetUid
+                MeetGuid = dto.MeetUid,
+                QrCode = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{timestamp}-{dto.MeetUid}"))
             };
 
             _context.Member.Add(member);
@@ -244,16 +248,16 @@ public class MembersController : ControllerBase
         }
     }
     
-    // GET: api/members/qrcode/1
-    [HttpGet("qrcode/{id}")]
-    public async Task<IActionResult> GetMemberByQr(int id)
+    // GET: api/members/qrcode/{qrcode}
+    [HttpGet("qrcode/{qrcode}")]
+    public async Task<IActionResult> GetMemberByQr(string qrcode)
     {
         try
         {
             var member = await _context.Member
                 .Include(m => m.Meet)
                 .Include(m => m.Meet.Status)
-                .FirstOrDefaultAsync(m => m.Id == id);
+                .FirstOrDefaultAsync(m => m.QrCode == qrcode);
 
             if (member == null)
                 return NotFound("Member not found");
@@ -284,8 +288,30 @@ public class MembersController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Error deleting member with ID: {id}");
+            _logger.LogError(ex, $"Error getting member by QR code: {qrcode}");
             return StatusCode(500, "Internal server error");
         }
+    }
+    
+    /**
+     * <p>Метод вернет по ссылке http://localhost:5215/api/members/qrcode/image/qrcode
+     * изображение `qr` кода который нужно вернуть пользователю при регистрации на событие.</p>
+     * <p>При первом запросе с qr кода, необходимо будет считать его недействительным.</p>
+     * <p>todo QR коды должны быть одноразовыми, затем его статус становиться `false`</p>
+     * <p>todo Решить как работать с url, что бы было разделение dev, и prod</p>
+     * <param name="qrcode">QR код который привязан к участнику, получаемый из `url`</param>
+     * <returns>Изображение QR кода</returns>
+     */
+    [HttpGet("qrcode/image/{qrcode}")]
+    public IActionResult GetQrImage(string qrcode)
+    {
+        var url = $"https://your-domain.com/api/members/qrcode/{qrcode}";
+
+        using var qrGenerator = new QRCodeGenerator();
+        using var qrCodeData = qrGenerator.CreateQrCode(url, QRCodeGenerator.ECCLevel.Q);
+
+        var pngQrCode = new PngByteQRCode(qrCodeData);
+        byte[] pngBytes = pngQrCode.GetGraphic(42);
+        return File(pngBytes, "image/png");
     }
 }

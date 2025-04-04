@@ -36,11 +36,13 @@
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/Microsoft.Extensions.Options.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/Microsoft.Extensions.Primitives.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/Microsoft.OpenApi.dll
+/Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/Microsoft.Win32.SystemEvents.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/Mono.TextTemplating.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/MySql.Data.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/MySql.EntityFrameworkCore.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/MySqlConnector.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/Pomelo.EntityFrameworkCore.MySql.dll
+/Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/QRCoder.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/Swashbuckle.AspNetCore.Swagger.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/Swashbuckle.AspNetCore.SwaggerGen.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/Swashbuckle.AspNetCore.SwaggerUI.dll
@@ -51,6 +53,8 @@
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/System.Composition.Runtime.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/System.Composition.TypedParts.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/System.Configuration.ConfigurationManager.dll
+/Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/System.Drawing.Common.dll
+/Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/System.Private.Windows.Core.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/System.Security.Cryptography.ProtectedData.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/System.Security.Permissions.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/System.Windows.Extensions.dll
@@ -120,6 +124,7 @@
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/tr/Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.resources.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/zh-Hans/Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.resources.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/zh-Hant/Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.resources.dll
+/Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/runtimes/win/lib/net9.0/Microsoft.Win32.SystemEvents.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/runtimes/win-x64/native/comerr64.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/runtimes/win-x64/native/gssapi64.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/runtimes/win-x64/native/k5sprt64.dll

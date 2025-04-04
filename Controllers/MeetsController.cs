@@ -139,13 +139,16 @@ public class MeetsController : ControllerBase
             // Добавляем участников, если они есть
             if (meetDto.Members != null && meetDto.Members.Any())
             {
+                var timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+                
                 var members = meetDto.Members.Select(m => new Member
                 {
                     Name = m.Name,
                     Companion = m.Companion,
                     Contact = m.Contact,
                     Role = m.Role,
-                    MeetGuid = meet.Uid
+                    MeetGuid = meet.Uid,
+                    QrCode = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{timestamp}-{meet.Uid}"))
                 }).ToList();
 
                 _context.Member.AddRange(members);

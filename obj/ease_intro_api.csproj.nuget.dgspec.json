@@ -66,9 +66,17 @@
               "target": "Package",
               "version": "[9.0.0-preview.3.efcore.9.0.0, )"
             },
+            "QRCoder": {
+              "target": "Package",
+              "version": "[1.6.0, )"
+            },
             "Swashbuckle.AspNetCore": {
               "target": "Package",
               "version": "[8.1.0, )"
+            },
+            "System.Drawing.Common": {
+              "target": "Package",
+              "version": "[9.0.3, )"
             }
           },
           "imports": [

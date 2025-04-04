@@ -21,4 +21,7 @@ public class CreateMemberDto
     
     [EnumDataType(typeof(Models.Member.MemberRole))]
     public Models.Member.MemberRole Role { get; set; } = Models.Member.MemberRole.Guest;
+    
+    [StringLength(160)]
+    public string QrCode { get; set; } = string.Empty;
 }

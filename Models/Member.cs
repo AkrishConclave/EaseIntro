@@ -38,4 +38,9 @@ public class Member
     // Роль участника (enum)
     [Required]
     public MemberRole Role { get; set; } = MemberRole.Guest;
+    
+    // QR код участника
+    [Required]
+    [StringLength(160)]
+    public string QrCode { get; set; } = string.Empty;
 }
