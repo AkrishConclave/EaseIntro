@@ -1,5 +1,4 @@
-### Файл для запуска теста эндпоитов без необходимости
-### использования сторонних программ
+### Файл для запуска теста эндпоитов без необходимости использования сторонних программ
 
 @ease_intro_api_HostAddress = http://localhost:5215
 
@@ -8,7 +7,7 @@ GET http://localhost:5215/api/meets
 Accept: application/json
 
 ### Получить митинг по ID
-GET http://localhost:5215/api/meets/ba417439-93a7-4ac1-bb50-e0bc78d5b80b
+GET http://localhost:5215/api/meets/21219d35-4f0a-4886-ad63-086b24351dbc
 Accept: application/json
 
 ### Создать новый митинг
@@ -16,11 +15,51 @@ POST http://localhost:5215/api/meets
 Content-Type: application/json
 
 {
-  "title": "string",
+  "title": "Встреча",
   "date": "2025-04-02T19:56:14.749Z",
   "location": "string",
-  "statusId": 2
+  "statusId": 1,
+  "limitMembers": 10,
+  "allowedPlusOne": true
+}
+
+### Создать новый митинг
+POST http://localhost:5215/api/meets
+Content-Type: application/json
+
+{
+  "title": "Деловая встреча",
+  "date": "2024-04-02T12:00:00Z",
+  "location": "Москва",
+  "statusId": 1,
+  "members": [
+    { "name": "Иван Иванов", "companion": "Иван Иванов", "role": 1, "contact": "ivan@example.com" },
+    { "name": "Мария Петрова", "companion": "Иван Иванов", "role": 1, "contact": "maria@example.com" }
+  ],
+  "limitMembers": 11,
+  "allowedPlusOne": true
 }
 
 ### Удалить митинг
-DELETE http://localhost:5215/api/meets/ba417439-93a7-4ac1-bb50-e0bc78d5b80b
+DELETE http://localhost:5215/api/meets/21219d35-4f0a-4886-ad63-086b24351dbc
+
+### Добавить участника
+GET http://localhost:5215/api/members
+Content-Type: application/json
+
+### Добавить участника
+GET http://localhost:5215/api/members/6
+Content-Type: application/json
+
+### Добавить участника
+POST http://localhost:5215/api/members
+Content-Type: application/json
+
+{
+  "name": "string",
+  "companion": "string",
+  "contact": "string",
+  "meetUid": "21219d35-4f0a-4886-ad63-086b24351dbc"
+}
+
+###
