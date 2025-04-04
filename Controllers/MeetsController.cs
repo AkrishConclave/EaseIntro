@@ -47,7 +47,8 @@ public class MeetsController : ControllerBase
                         Id = member.Id,
                         Name = member.Name,
                         Companion = member.Companion,
-                        Contact = member.Contact
+                        Contact = member.Contact,
+                        Role = member.Role.ToString()
                     }).ToList()
                 })
                 .ToListAsync();
@@ -95,7 +96,8 @@ public class MeetsController : ControllerBase
                     Id = member.Id,
                     Name = member.Name,
                     Companion = member.Companion,
-                    Contact = member.Contact
+                    Contact = member.Contact,
+                    Role = member.Role.ToString()
                 }).ToList()
             });
         }
@@ -142,7 +144,8 @@ public class MeetsController : ControllerBase
                     Name = m.Name,
                     Companion = m.Companion,
                     Contact = m.Contact,
-                    MeetGuid = meet.Uid // Привязываем участников к созданной встрече
+                    Role = m.Role,
+                    MeetGuid = meet.Uid
                 }).ToList();
 
                 _context.Member.AddRange(members);

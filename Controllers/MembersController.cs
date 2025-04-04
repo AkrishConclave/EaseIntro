@@ -38,6 +38,7 @@ public class MembersController : ControllerBase
                     Name = m.Name,
                     Companion = m.Companion,
                     Contact = m.Contact,
+                    Role = m.Role.ToString(),
                     Meet = new MeetResponseDto
                     {
                         Uid = m.Meet.Uid,
@@ -86,6 +87,7 @@ public class MembersController : ControllerBase
                 Name = member.Name,
                 Companion = member.Companion,
                 Contact = member.Contact,
+                Role = member.Role.ToString(),
                 Meet = member.Meet != null
                     ? new MeetResponseDto
                     {
@@ -148,6 +150,7 @@ public class MembersController : ControllerBase
                 Name = member.Name,
                 Companion = member.Companion,
                 Contact = member.Contact,
+                Role = member.Role.ToString(),
                 Meet = member.Meet != null
                     ? new MeetResponseDto
                     {
@@ -233,6 +236,51 @@ public class MembersController : ControllerBase
             _context.Member.Remove(member);
             await _context.SaveChangesAsync();
             return NoContent();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"Error deleting member with ID: {id}");
+            return StatusCode(500, "Internal server error");
+        }
+    }
+    
+    // GET: api/members/qrcode/1
+    [HttpGet("qrcode/{id}")]
+    public async Task<IActionResult> GetMemberByQr(int id)
+    {
+        try
+        {
+            var member = await _context.Member
+                .Include(m => m.Meet)
+                .Include(m => m.Meet.Status)
+                .FirstOrDefaultAsync(m => m.Id == id);
+
+            if (member == null)
+                return NotFound("Member not found");
+
+            var dto = new MemberResponseDto
+            {
+                Id = member.Id,
+                Name = member.Name,
+                Companion = member.Companion,
+                Contact = member.Contact,
+                Role = member.Role.ToString(),
+                Meet = new MeetResponseDto
+                {
+                    Uid = member.Meet.Uid,
+                    Title = member.Meet.Title,
+                    Date = member.Meet.Date,
+                    Location = member.Meet.Location,
+                    Status = new MeetStatusDto
+                    {
+                        Id = member.Meet.Status.Id,
+                        Title = member.Meet.Status.Title,
+                        Description = member.Meet.Status.Description
+                    }
+                }
+            };
+
+            return Ok(dto);
         }
         catch (Exception ex)
         {

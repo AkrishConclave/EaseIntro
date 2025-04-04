@@ -18,4 +18,7 @@ public class CreateMemberDto
     
     [Required]
     public Guid MeetUid { get; set; }
+    
+    [EnumDataType(typeof(Models.Member.MemberRole))]
+    public Models.Member.MemberRole Role { get; set; } = Models.Member.MemberRole.Guest;
 }

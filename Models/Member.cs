@@ -5,6 +5,14 @@ namespace ease_intro_api.Models;
 
 public class Member
 {
+    public enum MemberRole
+    {
+        Main,
+        Admin,
+        Staff,
+        Guest
+    }
+
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     public int Id { get; set; }
@@ -26,4 +34,8 @@ public class Member
     
     // Навигационное свойство
     public virtual Meet? Meet { get; set; }
+
+    // Роль участника (enum)
+    [Required]
+    public MemberRole Role { get; set; } = MemberRole.Guest;
 }

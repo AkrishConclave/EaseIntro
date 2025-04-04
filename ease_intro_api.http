@@ -31,8 +31,8 @@ Content-Type: application/json
   "location": "Москва",
   "statusId": 1,
   "members": [
-    { "name": "Иван Иванов", "companion": "Иван Иванов", "contact": "ivan@example.com" },
-    { "name": "Мария Петрова", "companion": "Иван Иванов", "contact": "maria@example.com" }
+    { "name": "Иван Иванов", "companion": "Иван Иванов", "role": 1, "contact": "ivan@example.com" },
+    { "name": "Мария Петрова", "companion": "Иван Иванов", "role": 1, "contact": "maria@example.com" }
   ]
 }
 
@@ -44,7 +44,7 @@ GET http://localhost:5215/api/members
 Content-Type: application/json
 
 ### Добавить участника
-GET http://localhost:5215/api/members/2
+GET http://localhost:5215/api/members/6
 Content-Type: application/json
 
 ### Добавить участника

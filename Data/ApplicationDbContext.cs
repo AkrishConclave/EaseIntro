@@ -9,7 +9,6 @@ public class ApplicationDbContext : DbContext
 
     public DbSet<Meet> Meets { get; set; }
     public DbSet<MeetStatus> MeetStatus { get; set; }
-    
     public DbSet<Member> Member { get; set; }
     
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -18,7 +17,8 @@ public class ApplicationDbContext : DbContext
             new MeetStatus { Id = 1, Title = "Встреча запланирована", Description = "Встреча запланирована" },
             new MeetStatus { Id = 2, Title = "Встреча в процессе", Description = "Встреча в процессе" },
             new MeetStatus { Id = 3, Title = "Встреча завершена", Description = "Встреча завершена" },
-            new MeetStatus { Id = 4, Title = "Встреча отменена", Description = "Встреча отменена" }
+            new MeetStatus { Id = 4, Title = "Встреча отменена", Description = "Встреча отменена" },
+            new MeetStatus { Id = 5, Title = "Открыто для регистрации", Description = "Открыто для регистрации" }
         );
         
         modelBuilder.Entity<Meet>()
