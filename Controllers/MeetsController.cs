@@ -5,6 +5,7 @@ using ease_intro_api.DTOs;
 using ease_intro_api.Models;
 using ease_intro_api.DTOs.Meet;
 using ease_intro_api.DTOs.Member;
+using Microsoft.AspNetCore.Authorization;
 
 namespace ease_intro_api.Controllers;
 
@@ -21,8 +22,15 @@ public class MeetsController : ControllerBase
         _logger = logger;
     }
 
-    // Получить все митинги
+    /**
+     * Получить все митинги
+     * Также тут пример авторизации
+     */
     [HttpGet]
+    [Authorize(Roles = "User")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)] // не передан токен
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]    // роль не соответствует
     public async Task<ActionResult<IEnumerable<MeetResponseDto>>> GetMeets()
     {
         try

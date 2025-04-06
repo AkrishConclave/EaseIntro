@@ -10,6 +10,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Meet> Meets { get; set; }
     public DbSet<MeetStatus> MeetStatus { get; set; }
     public DbSet<Member> Member { get; set; }
+    public DbSet<User> Users { get; set; }
     
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

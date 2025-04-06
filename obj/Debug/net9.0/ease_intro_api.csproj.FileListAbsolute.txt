@@ -6,12 +6,14 @@
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/ease_intro_api.runtimeconfig.json
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/ease_intro_api.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/ease_intro_api.pdb
+/Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/BCrypt.Net-Next.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/BouncyCastle.Cryptography.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/Google.Protobuf.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/Humanizer.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/K4os.Compression.LZ4.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/K4os.Compression.LZ4.Streams.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/K4os.Hash.xxHash.dll
+/Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/Microsoft.AspNetCore.Authentication.JwtBearer.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/Microsoft.AspNetCore.OpenApi.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/Microsoft.Bcl.AsyncInterfaces.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/Microsoft.Build.Locator.dll
@@ -35,6 +37,12 @@
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/Microsoft.Extensions.Logging.Abstractions.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/Microsoft.Extensions.Options.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/Microsoft.Extensions.Primitives.dll
+/Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/Microsoft.IdentityModel.Abstractions.dll
+/Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/Microsoft.IdentityModel.JsonWebTokens.dll
+/Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/Microsoft.IdentityModel.Logging.dll
+/Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/Microsoft.IdentityModel.Protocols.dll
+/Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
+/Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/Microsoft.IdentityModel.Tokens.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/Microsoft.OpenApi.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/Microsoft.Win32.SystemEvents.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/Mono.TextTemplating.dll
@@ -55,6 +63,7 @@
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/System.Configuration.ConfigurationManager.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/System.Drawing.Common.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/System.Private.Windows.Core.dll
+/Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/System.IdentityModel.Tokens.Jwt.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/System.Security.Cryptography.ProtectedData.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/System.Security.Permissions.dll
 /Users/akcent/Documents/asp.net/ease_intro_api/bin/Debug/net9.0/System.Windows.Extensions.dll
