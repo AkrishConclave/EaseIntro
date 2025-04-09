@@ -15,10 +15,12 @@ POST http://localhost:5215/api/meets
 Content-Type: application/json
 
 {
-  "title": "string",
+  "title": "Встреча",
   "date": "2025-04-02T19:56:14.749Z",
   "location": "string",
-  "statusId": 1
+  "statusId": 1,
+  "limitMembers": 10,
+  "allowedPlusOne": true
 }
 
 ### Создать новый митинг
@@ -33,7 +35,9 @@ Content-Type: application/json
   "members": [
     { "name": "Иван Иванов", "companion": "Иван Иванов", "role": 1, "contact": "ivan@example.com" },
     { "name": "Мария Петрова", "companion": "Иван Иванов", "role": 1, "contact": "maria@example.com" }
-  ]
+  ],
+  "limitMembers": 11,
+  "allowedPlusOne": true
 }
 
 ### Удалить митинг

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ease_intro_api.Data;
 
@@ -11,9 +12,11 @@ using ease_intro_api.Data;
 namespace ease_intro_api.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250409040708_AddOnewrMeeting")]
+    partial class AddOnewrMeeting
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -167,35 +170,17 @@ namespace ease_intro_api.Migrations
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
-                        .HasMaxLength(512)
-                        .HasColumnType("varchar(512)");
-
-                    b.Property<string>("PublicContact")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("varchar(200)");
-
-                    b.Property<string>("PublicName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("varchar(200)");
+                        .HasColumnType("longtext");
 
                     b.Property<string>("Role")
                         .IsRequired()
-                        .HasMaxLength(60)
-                        .HasColumnType("varchar(60)");
+                        .HasColumnType("longtext");
 
-                    b.Property<string>("UserEmail")
+                    b.Property<string>("UserName")
                         .IsRequired()
-                        .HasMaxLength(160)
-                        .HasColumnType("varchar(160)");
-
-                    b.Property<int?>("UserId")
-                        .HasColumnType("int");
+                        .HasColumnType("longtext");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("UserId");
 
                     b.ToTable("Users");
                 });
@@ -203,7 +188,7 @@ namespace ease_intro_api.Migrations
             modelBuilder.Entity("ease_intro_api.Models.Meet", b =>
                 {
                     b.HasOne("ease_intro_api.Models.User", "Owner")
-                        .WithMany()
+                        .WithMany("OwnedMeets")
                         .HasForeignKey("OwnerId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -230,13 +215,6 @@ namespace ease_intro_api.Migrations
                     b.Navigation("Meet");
                 });
 
-            modelBuilder.Entity("ease_intro_api.Models.User", b =>
-                {
-                    b.HasOne("ease_intro_api.Models.User", null)
-                        .WithMany("Users")
-                        .HasForeignKey("UserId");
-                });
-
             modelBuilder.Entity("ease_intro_api.Models.Meet", b =>
                 {
                     b.Navigation("Members");
@@ -249,7 +227,7 @@ namespace ease_intro_api.Migrations
 
             modelBuilder.Entity("ease_intro_api.Models.User", b =>
                 {
-                    b.Navigation("Users");
+                    b.Navigation("OwnedMeets");
                 });
 #pragma warning restore 612, 618
         }

@@ -2,7 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using ease_intro_api.Data;
-using ease_intro_api.DTOs;
+using ease_intro_api.DTOs.User;
 using ease_intro_api.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -26,13 +26,15 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<IActionResult> Register(RegisterDto dto)
     {
-        if (await _context.Users.AnyAsync(u => u.UserName == dto.Username))
+        if (await _context.Users.AnyAsync(u => u.UserEmail == dto.UserEmail))
             return BadRequest("User already exists");
 
         var hashedPassword = BCrypt.Net.BCrypt.HashPassword(dto.Password);
         var user = new User
         {
-            UserName = dto.Username,
+            UserEmail = dto.UserEmail,
+            PublicName = dto.PublicName,
+            PublicContact = dto.PublicContact,
             PasswordHash = hashedPassword
         };
 
@@ -45,7 +47,7 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginDto dto)
     {
-        var user = await _context.Users.SingleOrDefaultAsync(u => u.UserName == dto.Username);
+        var user = await _context.Users.SingleOrDefaultAsync(u => u.UserEmail == dto.UserEmail);
         if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
             return Unauthorized("Invalid credentials");
 
@@ -58,7 +60,7 @@ public class AuthController : ControllerBase
         var claims = new[]
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Name, user.UserName),
+            new Claim(ClaimTypes.Name, user.UserEmail),
             new Claim(ClaimTypes.Role, user.Role)
         };
 

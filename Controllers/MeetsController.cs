@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ease_intro_api.Data;
@@ -5,6 +6,7 @@ using ease_intro_api.DTOs;
 using ease_intro_api.Models;
 using ease_intro_api.DTOs.Meet;
 using ease_intro_api.DTOs.Member;
+using ease_intro_api.DTOs.User;
 using Microsoft.AspNetCore.Authorization;
 
 namespace ease_intro_api.Controllers;
@@ -38,25 +40,32 @@ public class MeetsController : ControllerBase
             var meets = await _context.Meets
                 .Include(m => m.Status)
                 .Include(m => m.Members) // Загружаем участников
+                .Include(m => m.Owner)
                 .Select(m => new MeetResponseDto
                 {
                     Uid = m.Uid,
                     Title = m.Title,
                     Date = m.Date,
                     Location = m.Location,
+                    LimitMembers = m.LimitMembers,
+                    AllowedPlusOne = m.AllowedPlusOne,
+                    Owner = new UserResponseDto
+                    {
+                        PublicName = m.Owner.PublicName,
+                        PublicContact = m.Owner.PublicContact,
+                    },
                     Status = new MeetStatusDto
                     {
-                        Id = m.Status.Id,
-                        Title = m.Status.Title,
+                        Title = m.Status!.Title,
                         Description = m.Status.Description
                     },
                     Members = m.Members.Select(member => new MemberResponseDto
                     {
-                        Id = member.Id,
                         Name = member.Name,
                         Companion = member.Companion,
                         Contact = member.Contact,
-                        Role = member.Role.ToString()
+                        Role = member.Role.ToString(),
+                        QrCode = member.QrCode
                     }).ToList()
                 })
                 .ToListAsync();
@@ -82,6 +91,7 @@ public class MeetsController : ControllerBase
             var meet = await _context.Meets
                 .Include(m => m.Status)
                 .Include(m => m.Members)
+                .Include(m => m.Owner)
                 .FirstOrDefaultAsync(m => m.Uid == uid);
 
             if (meet == null)
@@ -93,19 +103,25 @@ public class MeetsController : ControllerBase
                 Title = meet.Title,
                 Date = meet.Date,
                 Location = meet.Location,
+                LimitMembers = meet.LimitMembers,
+                AllowedPlusOne = meet.AllowedPlusOne,
+                Owner = new UserResponseDto
+                {
+                    PublicName = meet.Owner.PublicName,
+                    PublicContact = meet.Owner.PublicContact,
+                },
                 Status = new MeetStatusDto
                 {
-                    Id = meet.Status.Id,
-                    Title = meet.Status.Title,
+                    Title = meet.Status!.Title,
                     Description = meet.Status.Description
                 },
                 Members = meet.Members.Select(member => new MemberResponseDto
                 {
-                    Id = member.Id,
                     Name = member.Name,
                     Companion = member.Companion,
                     Contact = member.Contact,
-                    Role = member.Role.ToString()
+                    Role = member.Role.ToString(),
+                    QrCode = member.QrCode
                 }).ToList()
             });
         }
@@ -116,12 +132,23 @@ public class MeetsController : ControllerBase
         }
     }
 
-    // Создать новый митинг
+    /**
+     * <p>Создать новую встречу</p>
+     * <p>Сами встречи можно создавать двумя путями просто встречу,
+     * и еще можно передать массив с <b>`members`</b>, которые сразу
+     * будут записаны на встречу.</p>
+     */
     [HttpPost]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<MeetResponseDto>> CreateMeet([FromBody] MeetCreateDto meetDto)
     {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null)
+            return Unauthorized();
+
+        var userId = int.Parse(userIdClaim.Value);
+
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
@@ -138,6 +165,9 @@ public class MeetsController : ControllerBase
                 Title = meetDto.Title,
                 Date = meetDto.Date,
                 Location = meetDto.Location,
+                LimitMembers = meetDto.LimitMembers,
+                AllowedPlusOne = meetDto.AllowedPlusOne,
+                OwnerId = userId,
                 StatusId = meetDto.StatusId
             };
 
@@ -167,6 +197,7 @@ public class MeetsController : ControllerBase
             var createdMeet = await _context.Meets
                 .Include(m => m.Status)
                 .Include(m => m.Members)
+                .Include(m => m.Owner)
                 .FirstAsync(m => m.Uid == meet.Uid);
 
             return CreatedAtAction(nameof(GetMeet), 
@@ -177,18 +208,25 @@ public class MeetsController : ControllerBase
                     Title = createdMeet.Title,
                     Date = createdMeet.Date,
                     Location = createdMeet.Location,
+                    LimitMembers = createdMeet.LimitMembers,
+                    AllowedPlusOne = createdMeet.AllowedPlusOne,
+                    Owner = new UserResponseDto
+                    {
+                        PublicName = createdMeet.Owner.PublicName,
+                        PublicContact = createdMeet.Owner.PublicContact,
+                    },
                     Status = new MeetStatusDto
                     {
-                        Id = createdMeet.Status.Id,
-                        Title = createdMeet.Status.Title,
+                        Title = createdMeet.Status!.Title,
                         Description = createdMeet.Status.Description
                     },
                     Members = createdMeet.Members.Select(member => new MemberResponseDto
                     {
-                        Id = member.Id,
                         Name = member.Name,
                         Companion = member.Companion,
-                        Contact = member.Contact
+                        Contact = member.Contact,
+                        Role = member.Role.ToString(),
+                        QrCode = member.QrCode
                     }).ToList()
                 });
         }

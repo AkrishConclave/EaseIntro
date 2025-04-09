@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using ease_intro_api.DTOs.Member;
+using Google.Protobuf.WellKnownTypes;
 
 namespace ease_intro_api.DTOs.Meet;
 
@@ -12,11 +13,17 @@ public class MeetCreateDto
     [Required]
     public DateTime Date { get; set; }
 
+    [Required]
     [StringLength(260)]
-    public string? Location { get; set; }
+    public string Location { get; set; } =  string.Empty;
 
     [Required]
     [Range(1, 4)]
     public int StatusId { get; set; }
+    
+    public int LimitMembers { get; set; }
+    
+    public bool AllowedPlusOne { get; set; }
+    
     public List<CreateMemberDto>? Members { get; set; } = new();
 }

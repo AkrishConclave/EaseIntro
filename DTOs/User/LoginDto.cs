@@ -1,12 +1,12 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace ease_intro_api.DTOs;
+namespace ease_intro_api.DTOs.User;
 
 public class LoginDto
 {
     [Required]
     [StringLength(90)]
-    public string Username { get; set; } = null!;
+    public string UserEmail { get; set; } = null!;
     
     [Required]
     [StringLength(90)]

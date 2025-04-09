@@ -5,6 +5,7 @@ using ease_intro_api.Data;
 using ease_intro_api.DTOs;
 using ease_intro_api.DTOs.Meet;
 using ease_intro_api.DTOs.Member;
+using ease_intro_api.DTOs.User;
 using QRCoder;
 
 namespace ease_intro_api.Controllers;
@@ -35,21 +36,27 @@ public class MembersController : ControllerBase
             var members = await _context.Member
                 .Select(m => new MemberResponseDto
                 {
-                    Id = m.Id,
                     Name = m.Name,
                     Companion = m.Companion,
                     Contact = m.Contact,
                     Role = m.Role.ToString(),
+                    QrCode = m.QrCode,
                     Meet = new MeetResponseDto
                     {
-                        Uid = m.Meet.Uid,
+                        Uid = m.Meet!.Uid,
                         Title = m.Meet.Title,
                         Date = m.Meet.Date,
                         Location = m.Meet.Location,
+                        LimitMembers = m.Meet.LimitMembers,
+                        AllowedPlusOne = m.Meet.AllowedPlusOne,
+                        Owner = new UserResponseDto
+                        {
+                            PublicName = m.Meet.Owner.PublicName,
+                            PublicContact = m.Meet.Owner.PublicContact,
+                        },
                         Status = new MeetStatusDto
                         {
-                            Id = m.Meet.Status.Id,
-                            Title = m.Meet.Status.Title,
+                            Title = m.Meet.Status!.Title,
                             Description = m.Meet.Status.Description
                         }
                     }
@@ -74,7 +81,9 @@ public class MembersController : ControllerBase
         {
             var member = await _context.Member
                 .Include(m => m.Meet)
-                .ThenInclude(meet => meet.Status) // Загружаем MeetStatus
+                .ThenInclude(meet => meet!.Status)
+                .Include(m => m.Meet)
+                .ThenInclude(meet => meet!.Owner)
                 .FirstOrDefaultAsync(m => m.Id == id);
 
             if (member == null)
@@ -84,28 +93,30 @@ public class MembersController : ControllerBase
 
             return Ok(new MemberResponseDto
             {
-                Id = member.Id,
                 Name = member.Name,
                 Companion = member.Companion,
                 Contact = member.Contact,
                 Role = member.Role.ToString(),
-                Meet = member.Meet != null
-                    ? new MeetResponseDto
+                QrCode = member.QrCode,
+                Meet = new MeetResponseDto
+                {
+                    Uid = member.Meet!.Uid,
+                    Title = member.Meet.Title,
+                    Date = member.Meet.Date,
+                    Location = member.Meet.Location,
+                    LimitMembers = member.Meet.LimitMembers,
+                    AllowedPlusOne = member.Meet.AllowedPlusOne,
+                    Owner = new UserResponseDto
                     {
-                        Uid = member.Meet.Uid,
-                        Title = member.Meet.Title,
-                        Date = member.Meet.Date,
-                        Location = member.Meet.Location,
-                        Status = member.Meet.Status != null
-                            ? new MeetStatusDto
-                            {
-                                Id = member.Meet.Status.Id,
-                                Title = member.Meet.Status.Title,
-                                Description = member.Meet.Status.Description
-                            }
-                            : null
+                        PublicName = member.Meet.Owner.PublicName,
+                        PublicContact = member.Meet.Owner.PublicContact,
+                    },
+                    Status = new MeetStatusDto
+                    {
+                        Title = member.Meet.Status!.Title,
+                        Description = member.Meet.Status.Description
                     }
-                    : null
+                }
             });
         }
         catch (Exception ex)
@@ -150,11 +161,11 @@ public class MembersController : ControllerBase
 
             var responseDto = new MemberResponseDto
             {
-                Id = member.Id,
                 Name = member.Name,
                 Companion = member.Companion,
                 Contact = member.Contact,
                 Role = member.Role.ToString(),
+                QrCode = member.QrCode,
                 Meet = member.Meet != null
                     ? new MeetResponseDto
                     {
@@ -162,10 +173,16 @@ public class MembersController : ControllerBase
                         Title = member.Meet.Title,
                         Date = member.Meet.Date,
                         Location = member.Meet.Location,
+                        LimitMembers = member.Meet.LimitMembers,
+                        AllowedPlusOne = member.Meet.AllowedPlusOne,
+                        Owner = new UserResponseDto
+                        {
+                            PublicName = member.Meet.Owner.PublicName,
+                            PublicContact = member.Meet.Owner.PublicContact,
+                        },
                         Status = member.Meet.Status != null
                             ? new MeetStatusDto
                             {
-                                Id = member.Meet.Status.Id,
                                 Title = member.Meet.Status.Title,
                                 Description = member.Meet.Status.Description
                             }
@@ -256,7 +273,8 @@ public class MembersController : ControllerBase
         {
             var member = await _context.Member
                 .Include(m => m.Meet)
-                .Include(m => m.Meet.Status)
+                .Include(m => m.Meet!.Status)
+                .Include(m => m.Meet!.Owner)
                 .FirstOrDefaultAsync(m => m.QrCode == qrcode);
 
             if (member == null)
@@ -264,21 +282,27 @@ public class MembersController : ControllerBase
 
             var dto = new MemberResponseDto
             {
-                Id = member.Id,
                 Name = member.Name,
                 Companion = member.Companion,
                 Contact = member.Contact,
                 Role = member.Role.ToString(),
+                QrCode = member.QrCode,
                 Meet = new MeetResponseDto
                 {
-                    Uid = member.Meet.Uid,
+                    Uid = member.Meet!.Uid,
                     Title = member.Meet.Title,
                     Date = member.Meet.Date,
                     Location = member.Meet.Location,
+                    LimitMembers = member.Meet.LimitMembers,
+                    AllowedPlusOne = member.Meet.AllowedPlusOne,
+                    Owner = new UserResponseDto
+                    {
+                        PublicName = member.Meet.Owner.PublicName,
+                        PublicContact = member.Meet.Owner.PublicContact,
+                    },
                     Status = new MeetStatusDto
                     {
-                        Id = member.Meet.Status.Id,
-                        Title = member.Meet.Status.Title,
+                        Title = member.Meet.Status!.Title,
                         Description = member.Meet.Status.Description
                     }
                 }
