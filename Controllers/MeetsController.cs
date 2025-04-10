@@ -2,13 +2,11 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ease_intro_api.Data;
-using ease_intro_api.DTOs;
 using ease_intro_api.Models;
 using ease_intro_api.DTOs.Meet;
-using ease_intro_api.DTOs.Member;
-using ease_intro_api.DTOs.User;
 using Microsoft.AspNetCore.Authorization;
 using ease_intro_api.Core.Services.QR;
+using ease_intro_api.Mappers;
 
 namespace ease_intro_api.Controllers;
 
@@ -42,44 +40,18 @@ public class MeetsController : ControllerBase
                 .Include(m => m.Status)
                 .Include(m => m.Members) // Загружаем участников
                 .Include(m => m.Owner)
-                .Select(m => new MeetResponseDto
-                {
-                    Uid = m.Uid,
-                    Title = m.Title,
-                    Date = m.Date,
-                    Location = m.Location,
-                    LimitMembers = m.LimitMembers,
-                    AllowedPlusOne = m.AllowedPlusOne,
-                    Owner = new UserResponseDto
-                    {
-                        PublicName = m.Owner.PublicName,
-                        PublicContact = m.Owner.PublicContact,
-                    },
-                    Status = new MeetStatusDto
-                    {
-                        Title = m.Status!.Title,
-                        Description = m.Status.Description
-                    },
-                    Members = m.Members.Select(member => new MemberResponseDto
-                    {
-                        Name = member.Name,
-                        Companion = member.Companion,
-                        Contact = member.Contact,
-                        Role = member.Role.ToString(),
-                        QrCode = member.QrCode
-                    }).ToList()
-                })
                 .ToListAsync();
 
-            return Ok(meets);
+            var allMeet = meets.Select(MeetMapper.MapToDto).ToList();
+
+            return Ok(allMeet);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting all meets");
+            _logger.LogError(ex, "Ошибка получения встреч");
             return StatusCode(500, "Internal server error");
         }
     }
-
 
     // Получить один митинг по ID
     [HttpGet("{uid:guid}")]
@@ -95,40 +67,13 @@ public class MeetsController : ControllerBase
                 .Include(m => m.Owner)
                 .FirstOrDefaultAsync(m => m.Uid == uid);
 
-            if (meet == null)
-                return NotFound();
+            if (meet == null) { return NotFound(); }
 
-            return Ok(new MeetResponseDto
-            {
-                Uid = meet.Uid,
-                Title = meet.Title,
-                Date = meet.Date,
-                Location = meet.Location,
-                LimitMembers = meet.LimitMembers,
-                AllowedPlusOne = meet.AllowedPlusOne,
-                Owner = new UserResponseDto
-                {
-                    PublicName = meet.Owner.PublicName,
-                    PublicContact = meet.Owner.PublicContact,
-                },
-                Status = new MeetStatusDto
-                {
-                    Title = meet.Status!.Title,
-                    Description = meet.Status.Description
-                },
-                Members = meet.Members.Select(member => new MemberResponseDto
-                {
-                    Name = member.Name,
-                    Companion = member.Companion,
-                    Contact = member.Contact,
-                    Role = member.Role.ToString(),
-                    QrCode = member.QrCode
-                }).ToList()
-            });
+            return Ok(MeetMapper.MapToDto(meet));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Error getting meet with ID: {uid}");
+            _logger.LogError(ex, "Ошибка получения встречи по ее индетификатору");
             return StatusCode(500, "Internal server error");
         }
     }
@@ -137,7 +82,8 @@ public class MeetsController : ControllerBase
      * <p>Создать новую встречу</p>
      * <p>Сами встречи можно создавать двумя путями просто встречу,
      * и еще можно передать массив с <b>`members`</b>, которые сразу
-     * будут записаны на встречу.</p>
+     * будут записаны на встречу. Так вы сразу можете добавить участников с нужной вам ролью для него.</p>
+     * <p>Если вы не верно внесете данные, то отмениться создание встречи, и добавление участников к ней.</p>
      */
     [HttpPost]
     [ProducesResponseType(StatusCodes.Status201Created)]
@@ -166,7 +112,7 @@ public class MeetsController : ControllerBase
         try
         {
             var statusExists = await _context.MeetStatus.AnyAsync(s => s.Id == meetDto.StatusId);
-            if (!statusExists) { return BadRequest("Invalid StatusId"); }
+            if (!statusExists) { return BadRequest($"Не верный статус встречи: {meetDto.StatusId}"); }
 
             var meet = new Meet
             {
@@ -211,33 +157,7 @@ public class MeetsController : ControllerBase
 
             return CreatedAtAction(nameof(GetMeet), 
                 new { uid = createdMeet.Uid },
-                new MeetResponseDto
-                {
-                    Uid = createdMeet.Uid,
-                    Title = createdMeet.Title,
-                    Date = createdMeet.Date,
-                    Location = createdMeet.Location,
-                    LimitMembers = createdMeet.LimitMembers,
-                    AllowedPlusOne = createdMeet.AllowedPlusOne,
-                    Owner = new UserResponseDto
-                    {
-                        PublicName = createdMeet.Owner.PublicName,
-                        PublicContact = createdMeet.Owner.PublicContact,
-                    },
-                    Status = new MeetStatusDto
-                    {
-                        Title = createdMeet.Status!.Title,
-                        Description = createdMeet.Status.Description
-                    },
-                    Members = createdMeet.Members.Select(member => new MemberResponseDto
-                    {
-                        Name = member.Name,
-                        Companion = member.Companion,
-                        Contact = member.Contact,
-                        Role = member.Role.ToString(),
-                        QrCode = member.QrCode
-                    }).ToList()
-                });
+                MeetMapper.MapToDto(createdMeet));
         }
         catch (Exception ex)
         {
@@ -266,8 +186,7 @@ public class MeetsController : ControllerBase
                 return NotFound();
 
             var statusExists = await _context.MeetStatus.AnyAsync(s => s.Id == meetDto.StatusId);
-            if (!statusExists)
-                return BadRequest("Invalid StatusId");
+            if (!statusExists) { return BadRequest($"Не верный статус встречи: {meetDto.StatusId}"); }
 
             meet.Title = meetDto.Title;
             meet.Date = meetDto.Date;
@@ -279,14 +198,13 @@ public class MeetsController : ControllerBase
         }
         catch (DbUpdateConcurrencyException ex)
         {
-            _logger.LogError(ex, $"Concurrency error updating meet with ID: {uid}");
-            if (!_context.Meets.Any(m => m.Uid == uid))
-                return NotFound();
+            _logger.LogError(ex, "Другой пользователь уже изменил встречу, либо ее могли удалить.");
+            if (!_context.Meets.Any(m => m.Uid == uid)) { return NotFound(); }
             throw;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Error updating meet with ID: {uid}");
+            _logger.LogError(ex, "Ошибка обновления встречи с указаным идентификатором.");
             return StatusCode(500, "Internal server error");
         }
     }
@@ -300,8 +218,7 @@ public class MeetsController : ControllerBase
         try
         {
             var meet = await _context.Meets.FindAsync(uid);
-            if (meet == null)
-                return NotFound();
+            if (meet == null) { return NotFound(); }
 
             _context.Meets.Remove(meet);
             await _context.SaveChangesAsync();
@@ -309,7 +226,7 @@ public class MeetsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Error deleting meet with ID: {uid}");
+            _logger.LogError(ex, "Ошибка при удалении.");
             return StatusCode(500, "Internal server error");
         }
     }
