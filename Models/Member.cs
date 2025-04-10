@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -37,7 +38,8 @@ public class Member
 
     // Роль участника (enum)
     [Required]
-    public MemberRole Role { get; set; } = MemberRole.Guest;
+    [DefaultValue(MemberRole.Guest)]
+    public MemberRole Role { get; set; }
     
     // QR код участника
     [Required]

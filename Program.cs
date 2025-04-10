@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------------------------
 
 using System.Text;
+using ease_intro_api.Core.Services.QR;
 using ease_intro_api.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -14,6 +15,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(builder.Configuration.GetConnectionString("DefaultConnection"), 
         ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnection"))));
+
+builder.Services.AddScoped<ProcessingQr>();
 
 // Добавляем контроллеры
 builder.Services.AddControllers();
@@ -36,7 +39,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 // Добавляем поддержку OpenAPI (Swagger)
 builder.Services.AddEndpointsApiExplorer();
-// builder.Services.AddSwaggerGen();
 
 builder.Services.AddSwaggerGen(c =>
 {

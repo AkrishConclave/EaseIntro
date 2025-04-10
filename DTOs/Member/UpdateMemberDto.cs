@@ -12,4 +12,7 @@ public class UpdateMemberDto
     
     [StringLength(80)]
     public string? Contact { get; set; }
+    
+    [EnumDataType(typeof(Models.Member.MemberRole))]
+    public int? Role { get; set; }
 }

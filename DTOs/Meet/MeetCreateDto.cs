@@ -25,5 +25,5 @@ public class MeetCreateDto
     
     public bool AllowedPlusOne { get; set; }
     
-    public List<CreateMemberDto>? Members { get; set; } = new();
+    public List<CreateMemberWithMeetDto>? Members { get; set; } = new();
 }

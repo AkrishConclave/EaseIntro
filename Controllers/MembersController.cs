@@ -1,12 +1,10 @@
+using ease_intro_api.Core.Services.QR;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ease_intro_api.Models;
 using ease_intro_api.Data;
-using ease_intro_api.DTOs;
-using ease_intro_api.DTOs.Meet;
 using ease_intro_api.DTOs.Member;
-using ease_intro_api.DTOs.User;
-using QRCoder;
+using ease_intro_api.Mappers;
 
 namespace ease_intro_api.Controllers;
 
@@ -34,36 +32,14 @@ public class MembersController : ControllerBase
         try
         {
             var members = await _context.Member
-                .Select(m => new MemberResponseDto
-                {
-                    Name = m.Name,
-                    Companion = m.Companion,
-                    Contact = m.Contact,
-                    Role = m.Role.ToString(),
-                    QrCode = m.QrCode,
-                    Meet = new MeetResponseDto
-                    {
-                        Uid = m.Meet!.Uid,
-                        Title = m.Meet.Title,
-                        Date = m.Meet.Date,
-                        Location = m.Meet.Location,
-                        LimitMembers = m.Meet.LimitMembers,
-                        AllowedPlusOne = m.Meet.AllowedPlusOne,
-                        Owner = new UserResponseDto
-                        {
-                            PublicName = m.Meet.Owner.PublicName,
-                            PublicContact = m.Meet.Owner.PublicContact,
-                        },
-                        Status = new MeetStatusDto
-                        {
-                            Title = m.Meet.Status!.Title,
-                            Description = m.Meet.Status.Description
-                        }
-                    }
-                })
+                .Include(m => m.Meet)
+                .ThenInclude(m => m!.Owner)
+                .Include(m => m.Meet)
+                .ThenInclude(m => m!.Status)
+                .AsNoTracking()
                 .ToListAsync();
 
-            return Ok(members);
+            return members.Select(MemberMapper.MapToDto).ToList();
         }
         catch (Exception ex)
         {
@@ -86,38 +62,9 @@ public class MembersController : ControllerBase
                 .ThenInclude(meet => meet!.Owner)
                 .FirstOrDefaultAsync(m => m.Id == id);
 
-            if (member == null)
-            {
-                return NotFound();
-            }
-
-            return Ok(new MemberResponseDto
-            {
-                Name = member.Name,
-                Companion = member.Companion,
-                Contact = member.Contact,
-                Role = member.Role.ToString(),
-                QrCode = member.QrCode,
-                Meet = new MeetResponseDto
-                {
-                    Uid = member.Meet!.Uid,
-                    Title = member.Meet.Title,
-                    Date = member.Meet.Date,
-                    Location = member.Meet.Location,
-                    LimitMembers = member.Meet.LimitMembers,
-                    AllowedPlusOne = member.Meet.AllowedPlusOne,
-                    Owner = new UserResponseDto
-                    {
-                        PublicName = member.Meet.Owner.PublicName,
-                        PublicContact = member.Meet.Owner.PublicContact,
-                    },
-                    Status = new MeetStatusDto
-                    {
-                        Title = member.Meet.Status!.Title,
-                        Description = member.Meet.Status.Description
-                    }
-                }
-            });
+            if (member == null) { return NotFound(); }
+            
+            return Ok(MemberMapper.MapToDto(member));
         }
         catch (Exception ex)
         {
@@ -134,18 +81,11 @@ public class MembersController : ControllerBase
     {
         try
         {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState);
-            }
-
             // Проверяем существование Meet
             if (!await _context.Meets.AnyAsync(m => m.Uid == dto.MeetUid))
             {
                 return BadRequest("Meet not found");
             }
-
-            var timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
             
             var member = new Member
             {
@@ -153,45 +93,21 @@ public class MembersController : ControllerBase
                 Companion = dto.Companion,
                 Contact = dto.Contact,
                 MeetGuid = dto.MeetUid,
-                QrCode = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{timestamp}-{dto.MeetUid}"))
+                Role = Member.MemberRole.Guest,
+                QrCode = ProcessingQr.GenerateQr(dto.MeetUid)
             };
 
             _context.Member.Add(member);
             await _context.SaveChangesAsync();
+            
+            member = await _context.Member
+                .Include(m => m.Meet)
+                .ThenInclude(meet => meet!.Status)
+                .Include(m => m.Meet)
+                .ThenInclude(meet => meet!.Owner)
+                .FirstOrDefaultAsync(m => m.Id == member.Id);
 
-            var responseDto = new MemberResponseDto
-            {
-                Name = member.Name,
-                Companion = member.Companion,
-                Contact = member.Contact,
-                Role = member.Role.ToString(),
-                QrCode = member.QrCode,
-                Meet = member.Meet != null
-                    ? new MeetResponseDto
-                    {
-                        Uid = member.Meet.Uid,
-                        Title = member.Meet.Title,
-                        Date = member.Meet.Date,
-                        Location = member.Meet.Location,
-                        LimitMembers = member.Meet.LimitMembers,
-                        AllowedPlusOne = member.Meet.AllowedPlusOne,
-                        Owner = new UserResponseDto
-                        {
-                            PublicName = member.Meet.Owner.PublicName,
-                            PublicContact = member.Meet.Owner.PublicContact,
-                        },
-                        Status = member.Meet.Status != null
-                            ? new MeetStatusDto
-                            {
-                                Title = member.Meet.Status.Title,
-                                Description = member.Meet.Status.Description
-                            }
-                            : null
-                    }
-                    : null
-            };
-
-            return CreatedAtAction(nameof(GetMember), new { id = member.Id }, responseDto);
+            return CreatedAtAction(nameof(GetMember), new { id = member!.Id }, MemberMapper.MapToDto(member));
         }
         catch (Exception ex)
         {
@@ -210,24 +126,18 @@ public class MembersController : ControllerBase
         try
         {
             var member = await _context.Member.FindAsync(id);
-            if (member == null)
-            {
-                return NotFound();
-            }
+            if (member == null) { return NotFound(); }
 
-            if (!string.IsNullOrEmpty(dto.Name))
+            if (!string.IsNullOrEmpty(dto.Name)) { member.Name = dto.Name; }
+            if (!string.IsNullOrEmpty(dto.Companion)) { member.Companion = dto.Companion; }
+            if (!string.IsNullOrEmpty(dto.Contact)) { member.Contact = dto.Contact; }
+            if (dto.Role.HasValue)
             {
-                member.Name = dto.Name;
-            }
-
-            if (!string.IsNullOrEmpty(dto.Companion))
-            {
-                member.Companion = dto.Companion;
-            }
-
-            if (!string.IsNullOrEmpty(dto.Contact))
-            {
-                member.Contact = dto.Contact;
+                if (Enum.IsDefined(typeof(Member.MemberRole), dto.Role.Value))
+                {
+                    member.Role = (Member.MemberRole)dto.Role.Value;
+                }
+                else { return BadRequest("Недопустимое значение роли."); }
             }
 
             await _context.SaveChangesAsync();
@@ -249,10 +159,7 @@ public class MembersController : ControllerBase
         try
         {
             var member = await _context.Member.FindAsync(id);
-            if (member == null)
-            {
-                return NotFound();
-            }
+            if (member == null) { return NotFound(); }
 
             _context.Member.Remove(member);
             await _context.SaveChangesAsync();
@@ -277,38 +184,9 @@ public class MembersController : ControllerBase
                 .Include(m => m.Meet!.Owner)
                 .FirstOrDefaultAsync(m => m.QrCode == qrcode);
 
-            if (member == null)
-                return NotFound("Member not found");
-
-            var dto = new MemberResponseDto
-            {
-                Name = member.Name,
-                Companion = member.Companion,
-                Contact = member.Contact,
-                Role = member.Role.ToString(),
-                QrCode = member.QrCode,
-                Meet = new MeetResponseDto
-                {
-                    Uid = member.Meet!.Uid,
-                    Title = member.Meet.Title,
-                    Date = member.Meet.Date,
-                    Location = member.Meet.Location,
-                    LimitMembers = member.Meet.LimitMembers,
-                    AllowedPlusOne = member.Meet.AllowedPlusOne,
-                    Owner = new UserResponseDto
-                    {
-                        PublicName = member.Meet.Owner.PublicName,
-                        PublicContact = member.Meet.Owner.PublicContact,
-                    },
-                    Status = new MeetStatusDto
-                    {
-                        Title = member.Meet.Status!.Title,
-                        Description = member.Meet.Status.Description
-                    }
-                }
-            };
-
-            return Ok(dto);
+            if (member == null) { return NotFound("Member not found"); }
+            
+            return Ok(MemberMapper.MapToDto(member));
         }
         catch (Exception ex)
         {
@@ -330,12 +208,15 @@ public class MembersController : ControllerBase
     public IActionResult GetQrImage(string qrcode)
     {
         var url = $"https://your-domain.com/api/members/qrcode/{qrcode}";
-
-        using var qrGenerator = new QRCodeGenerator();
-        using var qrCodeData = qrGenerator.CreateQrCode(url, QRCodeGenerator.ECCLevel.Q);
-
-        var pngQrCode = new PngByteQRCode(qrCodeData);
-        byte[] pngBytes = pngQrCode.GetGraphic(42);
+        byte[] pngBytes = ProcessingQr.GenerateQrPng(url);
         return File(pngBytes, "image/png");
+    }
+    
+    [HttpGet("qrcode/image/{qrcode}/download")]
+    public IActionResult DownloadQrImage(string qrcode)
+    {
+        var url = $"https://your-domain.com/api/members/qrcode/{qrcode}";
+        byte[] pngBytes = ProcessingQr.GenerateQrPng(url);
+        return File(pngBytes, "image/png", "QR код для показа");
     }
 }

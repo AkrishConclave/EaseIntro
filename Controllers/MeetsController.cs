@@ -8,6 +8,7 @@ using ease_intro_api.DTOs.Meet;
 using ease_intro_api.DTOs.Member;
 using ease_intro_api.DTOs.User;
 using Microsoft.AspNetCore.Authorization;
+using ease_intro_api.Core.Services.QR;
 
 namespace ease_intro_api.Controllers;
 
@@ -144,21 +145,29 @@ public class MeetsController : ControllerBase
     public async Task<ActionResult<MeetResponseDto>> CreateMeet([FromBody] MeetCreateDto meetDto)
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-        if (userIdClaim == null)
-            return Unauthorized();
+        if (userIdClaim == null) { return Unauthorized(); }
 
         var userId = int.Parse(userIdClaim.Value);
 
-        if (!ModelState.IsValid)
-            return BadRequest(ModelState);
+        // Валидация роли у участников
+        if (meetDto.Members != null)
+        {
+            foreach (var m in meetDto.Members)
+            {
+                if (m.Role.HasValue && !Enum.IsDefined(typeof(Member.MemberRole), m.Role.Value))
+                {
+                    return BadRequest($"Недопустимая роль участника: {m.Role}");
+                }
+            }
+        }
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
 
         try
         {
             var statusExists = await _context.MeetStatus.AnyAsync(s => s.Id == meetDto.StatusId);
-            if (!statusExists)
-                return BadRequest("Invalid StatusId");
+            if (!statusExists) { return BadRequest("Invalid StatusId"); }
 
-            // Создаем встречу
             var meet = new Meet
             {
                 Uid = Guid.NewGuid(),
@@ -174,26 +183,26 @@ public class MeetsController : ControllerBase
             _context.Meets.Add(meet);
             await _context.SaveChangesAsync();
 
-            // Добавляем участников, если они есть
+            // Добавляем участников
             if (meetDto.Members != null && meetDto.Members.Any())
             {
-                var timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
-                
                 var members = meetDto.Members.Select(m => new Member
                 {
                     Name = m.Name,
                     Companion = m.Companion,
                     Contact = m.Contact,
-                    Role = m.Role,
+                    Role = m.Role ?? Member.MemberRole.Guest,
                     MeetGuid = meet.Uid,
-                    QrCode = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{timestamp}-{meet.Uid}"))
+                    QrCode = ProcessingQr.GenerateQr(meet.Uid)
                 }).ToList();
 
                 _context.Member.AddRange(members);
                 await _context.SaveChangesAsync();
             }
 
-            // Загружаем созданную встречу с участниками
+            await transaction.CommitAsync();
+
+            // Загружаем встречу с участниками
             var createdMeet = await _context.Meets
                 .Include(m => m.Status)
                 .Include(m => m.Members)
@@ -232,11 +241,11 @@ public class MeetsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating meet");
+            await transaction.RollbackAsync();
+            _logger.LogError(ex, "Ошибка при создании встречи");
             return StatusCode(500, "Internal server error");
         }
     }
-
 
     // Обновить митинг
     [HttpPut("{uid:guid}")]
