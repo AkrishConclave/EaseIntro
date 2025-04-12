@@ -11,7 +11,7 @@ public class MeetStatus
 
     [Required]
     [StringLength(60)]
-    public string Title { get; set; } = string.Empty;
+    public string Title { get; set; } = null!;
 
     [StringLength(120)]
     public string? Description { get; set; }

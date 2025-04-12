@@ -19,16 +19,17 @@ public class Member
     public int Id { get; set; }
     
     [Required]
-    [StringLength(60)]
-    public string Name { get; set; } = string.Empty;
-    
-    [Required]
-    [StringLength(60)]
-    public string Companion { get; set; } = string.Empty;
+    [StringLength(80)]
+    public string Name { get; set; } = null!;
     
     [Required]
     [StringLength(80)]
-    public string Contact  { get; set; } = string.Empty;
+    public string Companion { get; set; } = string.Empty;
+    
+    [Required]
+    [EmailAddress]
+    [StringLength(160)]
+    public string Contact  { get; set; } = null!;
     
     [ForeignKey(nameof(Meet))]
     public Guid MeetGuid { get; set; }
@@ -44,5 +45,5 @@ public class Member
     // QR код участника
     [Required]
     [StringLength(160)]
-    public string QrCode { get; set; } = string.Empty;
+    public string QrCode { get; set; } = null!;
 }

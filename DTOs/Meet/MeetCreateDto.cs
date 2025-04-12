@@ -8,7 +8,7 @@ public class MeetCreateDto
 {
     [Required]
     [StringLength(160)]
-    public string Title { get; set; } = string.Empty;
+    public string Title { get; set; } = null!;
 
     [Required]
     public DateTime Date { get; set; }

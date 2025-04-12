@@ -5,7 +5,7 @@ namespace ease_intro_api.DTOs.Meet;
 public class MeetUpdateDto
 {
     [StringLength(160)]
-    public string Title { get; set; } = string.Empty;
+    public string Title { get; set; } = null!;
     
     public DateTime Date { get; set; }
 

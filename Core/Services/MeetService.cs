@@ -19,9 +19,9 @@ public class MeetService
         return meetDto.LimitMembers != 0 && count > meetDto.LimitMembers;
     }
     
-    public async Task<IEnumerable<MeetResponseDto>> ShowAllMeetsAsync()
+    public async Task<IEnumerable<MeetResponseDto>> ShowAllMeetsAsync(int userId)
     {
-        var meets = await _meetRepository.GetAllMeetsAsync();
+        var meets = await _meetRepository.GetAllMeetsAsync(userId);
         return meets.Select(MeetMapper.MapToDto).ToList();
     }
 }

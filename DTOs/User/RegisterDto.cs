@@ -5,11 +5,12 @@ namespace ease_intro_api.DTOs.User;
 public class RegisterDto
 {
     [Required]
-    [StringLength(90)]
+    [EmailAddress]
+    [StringLength(160)]
     public string UserEmail { get; set; } = null!;
 
     [Required]
-    [StringLength(90)]
+    [StringLength(512)]
     public string Password { get; set; } = null!;
     
     [StringLength(200)]

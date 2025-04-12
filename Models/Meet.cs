@@ -12,7 +12,7 @@ public class Meet
 
     [Required]
     [StringLength(160)]
-    public string Title { get; set; } = string.Empty;
+    public string Title { get; set; } = null!;
 
     // todo Написать валидатор что бы не ввели прошлую дату
     [Required]

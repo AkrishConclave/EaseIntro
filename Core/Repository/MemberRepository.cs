@@ -3,8 +3,6 @@ using ease_intro_api.Data;
 using ease_intro_api.DTOs.Meet;
 using ease_intro_api.DTOs.Member;
 using ease_intro_api.Models;
-using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace ease_intro_api.Core.Repository;
@@ -105,11 +103,11 @@ public class MemberRepository
         }
     }
 
-    public async Task UpdateMember(UpdateMemberDto dto, Member member)
+    public async Task UpdateMemberAsync(UpdateMemberDto dto, Member member)
     {
-        if (!string.IsNullOrEmpty(dto.Name)) { member.Name = dto.Name; }
-        if (!string.IsNullOrEmpty(dto.Companion)) { member.Companion = dto.Companion; }
-        if (!string.IsNullOrEmpty(dto.Contact)) { member.Contact = dto.Contact; }
+        member.Name = dto.Name;
+        member.Companion = dto.Companion;
+        member.Contact = dto.Contact;
         member.Role = (Member.MemberRole)dto.Role!.Value;
         
         await _context.SaveChangesAsync();

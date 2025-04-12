@@ -21,14 +21,15 @@ public class MeetsController : ControllerBase
     private readonly MeetRepository _meetRepository;
     private readonly MemberRepository _memberRepository;
 
-    public MeetsController(
+    public MeetsController
+    (
         ApplicationDbContext context,
         ILogger<MeetsController> logger,
         MeetService meetService,
         MeetRepository meetRepository,
         MemberService memberService,
         MemberRepository memberRepository
-        )
+    )
     {
         _context = context;
         _logger = logger;
@@ -38,20 +39,34 @@ public class MeetsController : ControllerBase
         _memberRepository = memberRepository;
     }
     
-    /**
-     * Получить все митинги
-     * Также тут пример авторизации
-     */
+    /// <summary>
+    /// Получить все митинги для пользователя
+    /// </summary>
+    /// <remarks>
+    /// Этот метод возвращает список всех встреч для авторизованного пользователя. Пользователь должен быть авторизован
+    /// и иметь роль "User" для доступа к этому методу. В ответе возвращается список встреч с информацией о каждой встрече.
+    /// </remarks>
+    /// <returns>
+    /// Возвращает список встреч, если пользователь авторизован. В случае ошибок в процессе запроса возвращает соответствующие коды состояния.
+    /// </returns>
+    /// Возвращает список встреч (MeetResponseDto) для авторизованного пользователя (200 OK).
+    /// Возвращает 401 Unauthorized, если пользователь не авторизован.
+    /// Возвращает 403 Forbidden, если у пользователя нет прав для выполнения этого действия.
+    /// Возвращает 500 Internal Server Error, в случае исключения во время обработки запроса.
     [HttpGet]
     [Authorize(Roles = "User")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)] // не передан токен
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]    // роль не соответствует
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<IEnumerable<MeetResponseDto>>> GetMeets()
     {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null) { return Unauthorized(); }
+        var userId = int.Parse(userIdClaim.Value);
+        
         try
         {
-            return Ok(await _meetService.ShowAllMeetsAsync());
+            return Ok(await _meetService.ShowAllMeetsAsync(userId));
         }
         catch (Exception ex)
         {
@@ -60,7 +75,15 @@ public class MeetsController : ControllerBase
         }
     }
 
-    // Получить один митинг по ID
+    /// <summary>
+    /// Получить информацию о митинге по его уникальному идентификатору (UID).
+    /// </summary>
+    /// <remarks>
+    /// Этот метод возвращает информацию о митинге по его уникальному идентификатору в формате DTO. 
+    /// В случае, если митинг с указанным идентификатором не найден, возвращается ошибка 404 NotFound.
+    /// </remarks>
+    /// <param name="uid">Уникальный идентификатор митинга (GUID).</param>
+    /// <returns>Возвращает информацию о митинге (MeetResponseDto) или ошибку 404, если митинг не найден.</returns>
     [HttpGet("{uid:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -80,16 +103,23 @@ public class MeetsController : ControllerBase
         }
     }
 
-    /**
-     * <p>Создать новую встречу</p>
-     * <p>Сами встречи можно создавать двумя путями просто встречу,
-     * и еще можно передать массив с <b>`members`</b>, которые сразу
-     * будут записаны на встречу. Так вы сразу можете добавить участников с нужной вам ролью для него.</p>
-     * <p>Если вы не верно внесете данные, то отмениться создание встречи, и добавление участников к ней.</p>
-     */
+    /// <summary>
+    /// Создание новой встречи.
+    /// </summary>
+    /// <remarks>
+    /// Этот метод позволяет создать новую встречу. Если при создании встречи передается массив участников (members),
+    /// они автоматически добавляются к встрече с соответствующими ролями.
+    /// В случае неверных данных (например, превышение лимита участников), создание встречи будет отменено.
+    /// </remarks>
+    /// <param name="meetDto">Объект с данными для создания встречи. Может включать массив участников.</param>
+    /// <returns>Информация о созданной встрече (MeetResponseDto).</returns>
     [HttpPost]
-    [ProducesResponseType(StatusCodes.Status201Created)]
+    [Authorize(Roles = "User")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<MeetResponseDto>> CreateMeet([FromBody] MeetCreateDto meetDto)
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
@@ -123,11 +153,25 @@ public class MeetsController : ControllerBase
         }
     }
 
-    // Обновить митинг
+    /// <summary>
+    /// Обновление информации о встрече.
+    /// </summary>
+    /// <remarks>
+    /// Этот метод обновляет данные о встрече по ее уникальному идентификатору (UID). 
+    /// Если встреча с таким UID не найдена, возвращается ошибка. Также предусмотрена обработка ошибок конкурентных обновлений.
+    /// </remarks>
+    /// <param name="uid">Уникальный идентификатор встречи (GUID).</param>
+    /// <param name="meetDto">Объект с новыми данными для обновления встречи.</param>
+    /// <returns>Результат обновления. При успешном обновлении возвращается код 204 No Content, если встреча была найдена и обновлена.</returns>
+    /// <response code="204">Возвращается, если встреча была успешно обновлена.</response>
+    /// <response code="400">Возвращается, если встреча с указанным идентификатором не найдена или данные запроса некорректны.</response>
+    /// <response code="404">Возвращается, если встреча была удалена или не существует в базе данных.</response>
+    /// <response code="500">Возвращается, если произошла ошибка при обновлении встречи на сервере.</response>
     [HttpPut("{uid:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> UpdateMeet([FromRoute] Guid uid, [FromBody] MeetUpdateDto meetDto)
     {
 
@@ -153,10 +197,22 @@ public class MeetsController : ControllerBase
         }
     }
 
-    // Удалить митинг
+    /// <summary>
+    /// Удаление встречи по уникальному идентификатору.
+    /// </summary>
+    /// <remarks>
+    /// Этот метод удаляет встречу по ее уникальному идентификатору (UID). 
+    /// Если встреча с указанным идентификатором не найдена, возвращается ошибка.
+    /// </remarks>
+    /// <param name="uid">Уникальный идентификатор встречи (GUID).</param>
+    /// <returns>Результат удаления. При успешном удалении возвращается код 204 No Content.</returns>
+    /// <response code="204">Возвращается, если встреча была успешно удалена.</response>
+    /// <response code="404">Возвращается, если встреча с указанным идентификатором не найдена.</response>
+    /// <response code="500">Возвращается, если произошла ошибка при удалении встречи на сервере.</response>
     [HttpDelete("{uid:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> DeleteMeet(Guid uid)
     {
         try

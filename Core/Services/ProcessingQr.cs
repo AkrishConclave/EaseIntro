@@ -5,27 +5,14 @@ namespace ease_intro_api.Core.Services;
 
 public class ProcessingQr
 {
-
     /// <summary>
-    /// Формирует строку состоящую из текущей даты и идентификатора встречи.
-    /// </summary>
-    /// <param name="meetUid">Идентификатор встречи.</param>
-    /// <returns>Необходимая строка.</returns>
-    private static string CreateQrSource(Guid meetUid)
-    {
-        var timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
-        return $"{timestamp}-{meetUid}";
-    }
-    
-    /// <summary>
-    /// Создает исходную строку для QR-кода на основании текущей даты и <b>Guid</b> встречи
+    /// Создает исходную строку для QR-кода.
     /// </summary>
     /// <param name="meetUid">Уникальный идентификатор встречи.</param>
     /// <returns>Строка-идентификатор на основании которой генерируется изображение QR-кода.</returns>
     public static string GenerateQr(Guid meetUid)
     {
-        var source = CreateQrSource(meetUid);
-        return Convert.ToBase64String(Encoding.UTF8.GetBytes(source));
+        return Convert.ToBase64String(Encoding.UTF8.GetBytes($"{Guid.NewGuid()}-{meetUid}"));
     }
     
     /// <summary>

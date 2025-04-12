@@ -10,11 +10,12 @@ public class User
 
     [Required]
     [MaxLength(160)]
-    public string UserEmail { get; set; } = string.Empty;
+    [EmailAddress]
+    public string UserEmail { get; set; } = null!;
 
     [Required]
     [MaxLength(512)]
-    public string PasswordHash { get; set; } = string.Empty;
+    public string PasswordHash { get; set; } = null!;
     
     [DefaultValue("Пользователь не указал публичное имя")]
     [StringLength(200)]

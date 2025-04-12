@@ -1,6 +1,5 @@
 using ease_intro_api.Data;
 using ease_intro_api.DTOs.Meet;
-using ease_intro_api.DTOs.Member;
 using ease_intro_api.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -50,9 +49,11 @@ public class MeetRepository
     /**
      * Получить все встречи
      */
-    public async Task<List<Meet>> GetAllMeetsAsync()
+    public async Task<List<Meet>> GetAllMeetsAsync(int id)
     {
-        return await GetMeetsQuery().ToListAsync();
+        return await GetMeetsQuery()
+            .Where(m => m.OwnerId == id)
+            .ToListAsync();
     }
 
     public async Task UpdateMeetAsync(MeetUpdateDto meetDto, Meet meet)
