@@ -3,7 +3,8 @@
 // ---------------------------------------------------------------------------------------------
 
 using System.Text;
-using ease_intro_api.Core.Services.QR;
+using ease_intro_api.Core.Repository;
+using ease_intro_api.Core.Services;
 using ease_intro_api.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -16,10 +17,13 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(builder.Configuration.GetConnectionString("DefaultConnection"), 
         ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnection"))));
 
-builder.Services.AddScoped<ProcessingQr>();
-
 // Добавляем контроллеры
 builder.Services.AddControllers();
+builder.Services.AddScoped<ProcessingQr>();
+builder.Services.AddScoped<MeetService>();
+builder.Services.AddScoped<MemberService>();
+builder.Services.AddScoped<MeetRepository>();
+builder.Services.AddScoped<MemberRepository>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

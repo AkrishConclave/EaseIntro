@@ -1,11 +1,11 @@
 using System.Security.Claims;
+using ease_intro_api.Core.Repository;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ease_intro_api.Data;
-using ease_intro_api.Models;
 using ease_intro_api.DTOs.Meet;
 using Microsoft.AspNetCore.Authorization;
-using ease_intro_api.Core.Services.QR;
+using ease_intro_api.Core.Services;
 using ease_intro_api.Mappers;
 
 namespace ease_intro_api.Controllers;
@@ -16,13 +16,28 @@ public class MeetsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<MeetsController> _logger;
+    private readonly MeetService _meetService;
+    private readonly MemberService _memberService;
+    private readonly MeetRepository _meetRepository;
+    private readonly MemberRepository _memberRepository;
 
-    public MeetsController(ApplicationDbContext context, ILogger<MeetsController> logger)
+    public MeetsController(
+        ApplicationDbContext context,
+        ILogger<MeetsController> logger,
+        MeetService meetService,
+        MeetRepository meetRepository,
+        MemberService memberService,
+        MemberRepository memberRepository
+        )
     {
         _context = context;
         _logger = logger;
+        _meetService = meetService;
+        _meetRepository = meetRepository;
+        _memberService = memberService;
+        _memberRepository = memberRepository;
     }
-
+    
     /**
      * Получить все митинги
      * Также тут пример авторизации
@@ -36,15 +51,7 @@ public class MeetsController : ControllerBase
     {
         try
         {
-            var meets = await _context.Meets
-                .Include(m => m.Status)
-                .Include(m => m.Members) // Загружаем участников
-                .Include(m => m.Owner)
-                .ToListAsync();
-
-            var allMeet = meets.Select(MeetMapper.MapToDto).ToList();
-
-            return Ok(allMeet);
+            return Ok(await _meetService.ShowAllMeetsAsync());
         }
         catch (Exception ex)
         {
@@ -61,14 +68,9 @@ public class MeetsController : ControllerBase
     {
         try
         {
-            var meet = await _context.Meets
-                .Include(m => m.Status)
-                .Include(m => m.Members)
-                .Include(m => m.Owner)
-                .FirstOrDefaultAsync(m => m.Uid == uid);
-
-            if (meet == null) { return NotFound(); }
-
+            var meet = await _meetRepository.GetMeetByUidOrNullAsync(uid);
+            
+            if (meet == null) { return BadRequest("Встречи с указаным идентификатором не найдено."); }
             return Ok(MeetMapper.MapToDto(meet));
         }
         catch (Exception ex)
@@ -94,66 +96,20 @@ public class MeetsController : ControllerBase
         if (userIdClaim == null) { return Unauthorized(); }
 
         var userId = int.Parse(userIdClaim.Value);
-
-        // Валидация роли у участников
-        if (meetDto.Members != null)
+        
+        if (MeetService.ShiftLimit(meetDto))
         {
-            foreach (var m in meetDto.Members)
-            {
-                if (m.Role.HasValue && !Enum.IsDefined(typeof(Member.MemberRole), m.Role.Value))
-                {
-                    return BadRequest($"Недопустимая роль участника: {m.Role}");
-                }
-            }
+            return BadRequest($"Количество участников превышено, допустимо: {meetDto.LimitMembers}.");
         }
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
         try
         {
-            var statusExists = await _context.MeetStatus.AnyAsync(s => s.Id == meetDto.StatusId);
-            if (!statusExists) { return BadRequest($"Не верный статус встречи: {meetDto.StatusId}"); }
-
-            var meet = new Meet
-            {
-                Uid = Guid.NewGuid(),
-                Title = meetDto.Title,
-                Date = meetDto.Date,
-                Location = meetDto.Location,
-                LimitMembers = meetDto.LimitMembers,
-                AllowedPlusOne = meetDto.AllowedPlusOne,
-                OwnerId = userId,
-                StatusId = meetDto.StatusId
-            };
-
-            _context.Meets.Add(meet);
-            await _context.SaveChangesAsync();
-
-            // Добавляем участников
-            if (meetDto.Members != null && meetDto.Members.Any())
-            {
-                var members = meetDto.Members.Select(m => new Member
-                {
-                    Name = m.Name,
-                    Companion = m.Companion,
-                    Contact = m.Contact,
-                    Role = m.Role ?? Member.MemberRole.Guest,
-                    MeetGuid = meet.Uid,
-                    QrCode = ProcessingQr.GenerateQr(meet.Uid)
-                }).ToList();
-
-                _context.Member.AddRange(members);
-                await _context.SaveChangesAsync();
-            }
-
+            var meet = await _meetRepository.CreateMeetAsync(meetDto, userId);
+            await _memberRepository.CreateMemberWithMeet(meetDto, meet);
             await transaction.CommitAsync();
-
-            // Загружаем встречу с участниками
-            var createdMeet = await _context.Meets
-                .Include(m => m.Status)
-                .Include(m => m.Members)
-                .Include(m => m.Owner)
-                .FirstAsync(m => m.Uid == meet.Uid);
+            var createdMeet = await _meetRepository.GetMeetByUidAsync(meet.Uid);
 
             return CreatedAtAction(nameof(GetMeet), 
                 new { uid = createdMeet.Uid },
@@ -172,28 +128,16 @@ public class MeetsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> UpdateMeet(
-        [FromRoute] Guid uid,
-        [FromBody] MeetUpdateDto meetDto)
+    public async Task<IActionResult> UpdateMeet([FromRoute] Guid uid, [FromBody] MeetUpdateDto meetDto)
     {
-        if (!ModelState.IsValid)
-            return BadRequest(ModelState);
 
         try
         {
-            var meet = await _context.Meets.FindAsync(uid);
-            if (meet == null)
-                return NotFound();
-
-            var statusExists = await _context.MeetStatus.AnyAsync(s => s.Id == meetDto.StatusId);
-            if (!statusExists) { return BadRequest($"Не верный статус встречи: {meetDto.StatusId}"); }
-
-            meet.Title = meetDto.Title;
-            meet.Date = meetDto.Date;
-            meet.Location = meetDto.Location;
-            meet.StatusId = meetDto.StatusId;
-
-            await _context.SaveChangesAsync();
+            var meet = await _meetRepository.GetMeetByUidOrNullAsync(uid);
+            if (meet == null) { return BadRequest("Встречи с указаным идентификатором не найдено."); }
+            
+            await _meetRepository.UpdateMeetAsync(meetDto, meet);
+            
             return NoContent();
         }
         catch (DbUpdateConcurrencyException ex)

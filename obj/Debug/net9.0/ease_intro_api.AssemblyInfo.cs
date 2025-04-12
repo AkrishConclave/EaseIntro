@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ease_intro_api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d5bea81dfaaad36dc62822c0b2cceb95a4099e70")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+4b06bfe9c3eeb4504e732ee4faf48f7afb1a717c")]
 [assembly: System.Reflection.AssemblyProductAttribute("ease_intro_api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ease_intro_api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

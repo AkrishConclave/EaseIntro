@@ -1,7 +1,6 @@
-using ease_intro_api.Core.Services.QR;
+using ease_intro_api.Core.Repository;
+using ease_intro_api.Core.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using ease_intro_api.Models;
 using ease_intro_api.Data;
 using ease_intro_api.DTOs.Member;
 using ease_intro_api.Mappers;
@@ -15,13 +14,27 @@ public class MembersController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<MembersController> _logger;
+    private readonly MemberRepository _memberRepository;
+    private readonly MemberService _memberService;
+    private readonly MeetRepository _meetRepository;
+
+    private readonly string _url;
 
     public MembersController(
         ApplicationDbContext context,
-        ILogger<MembersController> logger)
+        ILogger<MembersController> logger,
+        MemberRepository memberRepository,
+        MemberService memberService,
+        MeetRepository meetRepository
+        )
     {
         _context = context;
         _logger = logger;
+        _memberRepository = memberRepository;
+        _memberService = memberService;
+        _meetRepository = meetRepository;
+        
+        _url = "https://your-domain.com/api/members/qrcode/";
     }
 
     // GET: api/members
@@ -31,19 +44,11 @@ public class MembersController : ControllerBase
     {
         try
         {
-            var members = await _context.Member
-                .Include(m => m.Meet)
-                .ThenInclude(m => m!.Owner)
-                .Include(m => m.Meet)
-                .ThenInclude(m => m!.Status)
-                .AsNoTracking()
-                .ToListAsync();
-
-            return members.Select(MemberMapper.MapToDto).ToList();
+            return Ok(await _memberService.ShowAllMembersAsync());
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting members");
+            _logger.LogError(ex, "Ошибка получения участников встречи");
             return StatusCode(500, "Internal server error");
         }
     }
@@ -55,25 +60,22 @@ public class MembersController : ControllerBase
     {
         try
         {
-            var member = await _context.Member
-                .Include(m => m.Meet)
-                .ThenInclude(meet => meet!.Status)
-                .Include(m => m.Meet)
-                .ThenInclude(meet => meet!.Owner)
-                .FirstOrDefaultAsync(m => m.Id == id);
-
+            var member = await _memberRepository.GetMemberByIdOrNullAsync(id);
             if (member == null) { return NotFound(); }
             
             return Ok(MemberMapper.MapToDto(member));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting member with ID: {Id}", id);
+            _logger.LogError(ex, "Нет участника с укзаным идентификатором.");
             return StatusCode(500, "Internal server error");
         }
     }
 
-    // POST: api/members
+    /**
+     * <p>Регистрация участника на встречу</p>
+     * <p>После прохождения регистрации пользователю в ответ приходит QR для предъвления.</p>
+     */
     [HttpPost]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -81,42 +83,23 @@ public class MembersController : ControllerBase
     {
         try
         {
-            // Проверяем существование Meet
-            if (!await _context.Meets.AnyAsync(m => m.Uid == dto.MeetUid))
-            {
-                return BadRequest("Meet not found");
-            }
+            var meet = await _meetRepository.GetMeetByUidOrNullAsync(dto.MeetUid);
+            if (meet == null) { return BadRequest("Встречи с указаным идентификатором не найдено."); }
+            var member = await _memberRepository.CreateMember(dto);
+            byte[] pngBytes = ProcessingQr.GenerateQrPng($"{_url}{member.QrCode}");
             
-            var member = new Member
-            {
-                Name = dto.Name,
-                Companion = dto.Companion,
-                Contact = dto.Contact,
-                MeetGuid = dto.MeetUid,
-                Role = Member.MemberRole.Guest,
-                QrCode = ProcessingQr.GenerateQr(dto.MeetUid)
-            };
-
-            _context.Member.Add(member);
-            await _context.SaveChangesAsync();
-            
-            member = await _context.Member
-                .Include(m => m.Meet)
-                .ThenInclude(meet => meet!.Status)
-                .Include(m => m.Meet)
-                .ThenInclude(meet => meet!.Owner)
-                .FirstOrDefaultAsync(m => m.Id == member.Id);
-
-            return CreatedAtAction(nameof(GetMember), new { id = member!.Id }, MemberMapper.MapToDto(member));
+            return File(pngBytes, "image/png");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating member");
+            _logger.LogError(ex, "Ошибка регистрации на встречу.");
             return StatusCode(500, "Internal server error");
         }
     }
-
-    // PUT: api/members/5
+    
+    /**
+     * Согласно RESTful стандартам, не нужно дополнительное содержимое при успешном обновлении.
+     */
     [HttpPut("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -125,32 +108,18 @@ public class MembersController : ControllerBase
     {
         try
         {
-            var member = await _context.Member.FindAsync(id);
-            if (member == null) { return NotFound(); }
-
-            if (!string.IsNullOrEmpty(dto.Name)) { member.Name = dto.Name; }
-            if (!string.IsNullOrEmpty(dto.Companion)) { member.Companion = dto.Companion; }
-            if (!string.IsNullOrEmpty(dto.Contact)) { member.Contact = dto.Contact; }
-            if (dto.Role.HasValue)
-            {
-                if (Enum.IsDefined(typeof(Member.MemberRole), dto.Role.Value))
-                {
-                    member.Role = (Member.MemberRole)dto.Role.Value;
-                }
-                else { return BadRequest("Недопустимое значение роли."); }
-            }
-
-            await _context.SaveChangesAsync();
+            var member = await _memberRepository.GetMemberByIdAsync(id);
+            await _memberRepository.UpdateMember(dto, member);
+            
             return NoContent();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Error updating member with ID: {id}");
+            _logger.LogError(ex, "Ошибка обновления данных для участника с указаным идентификатором.");
             return StatusCode(500, "Internal server error");
         }
     }
-
-    // DELETE: api/members/5
+    
     [HttpDelete("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -158,16 +127,15 @@ public class MembersController : ControllerBase
     {
         try
         {
-            var member = await _context.Member.FindAsync(id);
-            if (member == null) { return NotFound(); }
-
+            var member = await _memberRepository.GetMemberByIdAsync(id);
             _context.Member.Remove(member);
             await _context.SaveChangesAsync();
+            
             return NoContent();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Error deleting member with ID: {id}");
+            _logger.LogError(ex, "Ошибка удаления участника встречи с указаным идентификатором.");
             return StatusCode(500, "Internal server error");
         }
     }
@@ -178,19 +146,14 @@ public class MembersController : ControllerBase
     {
         try
         {
-            var member = await _context.Member
-                .Include(m => m.Meet)
-                .Include(m => m.Meet!.Status)
-                .Include(m => m.Meet!.Owner)
-                .FirstOrDefaultAsync(m => m.QrCode == qrcode);
-
-            if (member == null) { return NotFound("Member not found"); }
+            var member = await _memberRepository.GetMemberByQrCodeOrNullAsync(qrcode);
+            if (member == null) { return NotFound("QR не найден."); }
             
             return Ok(MemberMapper.MapToDto(member));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Error getting member by QR code: {qrcode}");
+            _logger.LogError(ex, "Ошибка в процессе получения участника встречи по указанному идентификатору.");
             return StatusCode(500, "Internal server error");
         }
     }
@@ -207,16 +170,14 @@ public class MembersController : ControllerBase
     [HttpGet("qrcode/image/{qrcode}")]
     public IActionResult GetQrImage(string qrcode)
     {
-        var url = $"https://your-domain.com/api/members/qrcode/{qrcode}";
-        byte[] pngBytes = ProcessingQr.GenerateQrPng(url);
+        byte[] pngBytes = ProcessingQr.GenerateQrPng($"{_url}{qrcode}");
         return File(pngBytes, "image/png");
     }
     
     [HttpGet("qrcode/image/{qrcode}/download")]
     public IActionResult DownloadQrImage(string qrcode)
     {
-        var url = $"https://your-domain.com/api/members/qrcode/{qrcode}";
-        byte[] pngBytes = ProcessingQr.GenerateQrPng(url);
-        return File(pngBytes, "image/png", "QR код для показа");
+        byte[] pngBytes = ProcessingQr.GenerateQrPng($"{_url}{qrcode}");
+        return File(pngBytes, "image/png", "QR код для предъявления.");
     }
 }

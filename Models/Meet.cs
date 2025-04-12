@@ -30,6 +30,7 @@ public class Meet
     [DefaultValue(0)]
     public int LimitMembers { get; set; }
 
+    // Запрещаем возможность `+1` для регистрируемых
     [DefaultValue(false)]
     public bool AllowedPlusOne { get; set; } 
     

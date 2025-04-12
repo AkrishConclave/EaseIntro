@@ -9,14 +9,13 @@ public class MeetUpdateDto
     
     public DateTime Date { get; set; }
 
-    [Required]
     [StringLength(260)]
     public string Location { get; set; } = string.Empty;
-
-    [Required]
-    [Range(1, 4)]
+    
+    [Range(1, 4, ErrorMessage = "Не верно выбран статус встречи.")]
     public int StatusId { get; set; }
     
+    [Range(0, int.MaxValue, ErrorMessage = "Значение должно быть больше или равно 0.")]
     public int LimitMembers { get; set; }
     
     public bool AllowedPlusOne { get; set; }
