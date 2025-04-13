@@ -3,8 +3,9 @@
 // ---------------------------------------------------------------------------------------------
 
 using System.Text;
-using ease_intro_api.Core.Repository;
+using ease_intro_api.Data.Repository;
 using ease_intro_api.Core.Services;
+using ease_intro_api.Core.Services.Interfaces;
 using ease_intro_api.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -19,11 +20,14 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 // Добавляем контроллеры
 builder.Services.AddControllers();
-builder.Services.AddScoped<ProcessingQr>();
+builder.Services.AddScoped<ProcessingQrService>();
 builder.Services.AddScoped<MeetService>();
 builder.Services.AddScoped<MemberService>();
 builder.Services.AddScoped<MeetRepository>();
 builder.Services.AddScoped<MemberRepository>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IUserContextService, UserContextService>();
+
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

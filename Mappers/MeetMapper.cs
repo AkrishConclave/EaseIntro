@@ -8,9 +8,9 @@ namespace ease_intro_api.Mappers;
 
 public static class MeetMapper
 {
-    public static MeetResponseDto MapToDto(Meet meet)
+    public static ResponseMeetDto MapToDto(Meet meet)
     {
-        return new MeetResponseDto
+        return new ResponseMeetDto
         {
             Uid = meet.Uid,
             Title = meet.Title,
@@ -20,20 +20,20 @@ public static class MeetMapper
             AllowedPlusOne = meet.AllowedPlusOne,
             Owner = MapUserToDto(meet.Owner),
             Status = MapStatusToDto(meet.Status!),
-            Members = meet.Members?.Select(m => new MemberResponseDto
+            Members = meet.Members?.Select(m => new ResponseMemberDto
             {
                 Name = m.Name,
                 Companion = m.Companion,
                 Contact = m.Contact,
                 Role = m.Role.ToString(),
                 QrCode = m.QrCode
-            }).ToList() ?? new List<MemberResponseDto>()
+            }).ToList() ?? new List<ResponseMemberDto>()
         };
     }
 
-    private static UserResponseDto MapUserToDto(User user)
+    private static ResponseUserDto MapUserToDto(User user)
     {
-        return new UserResponseDto
+        return new ResponseUserDto
         {
             PublicName = user.PublicName,
             PublicContact = user.PublicContact

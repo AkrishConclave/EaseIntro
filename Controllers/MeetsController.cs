@@ -1,5 +1,4 @@
-using System.Security.Claims;
-using ease_intro_api.Core.Repository;
+using ease_intro_api.Data.Repository;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ease_intro_api.Data;
@@ -17,7 +16,6 @@ public class MeetsController : ControllerBase
     private readonly ApplicationDbContext _context;
     private readonly ILogger<MeetsController> _logger;
     private readonly MeetService _meetService;
-    private readonly MemberService _memberService;
     private readonly MeetRepository _meetRepository;
     private readonly MemberRepository _memberRepository;
 
@@ -27,7 +25,6 @@ public class MeetsController : ControllerBase
         ILogger<MeetsController> logger,
         MeetService meetService,
         MeetRepository meetRepository,
-        MemberService memberService,
         MemberRepository memberRepository
     )
     {
@@ -35,7 +32,6 @@ public class MeetsController : ControllerBase
         _logger = logger;
         _meetService = meetService;
         _meetRepository = meetRepository;
-        _memberService = memberService;
         _memberRepository = memberRepository;
     }
     
@@ -58,15 +54,11 @@ public class MeetsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    public async Task<ActionResult<IEnumerable<MeetResponseDto>>> GetMeets()
+    public async Task<ActionResult<IEnumerable<ResponseMeetDto>>> GetMeets()
     {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-        if (userIdClaim == null) { return Unauthorized(); }
-        var userId = int.Parse(userIdClaim.Value);
-        
         try
         {
-            return Ok(await _meetService.ShowAllMeetsAsync(userId));
+            return Ok(await _meetService.ShowAllMeetsAsync());
         }
         catch (Exception ex)
         {
@@ -87,7 +79,7 @@ public class MeetsController : ControllerBase
     [HttpGet("{uid:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<MeetResponseDto>> GetMeet(Guid uid)
+    public async Task<ActionResult<ResponseMeetDto>> GetMeet(Guid uid)
     {
         try
         {
@@ -111,7 +103,7 @@ public class MeetsController : ControllerBase
     /// они автоматически добавляются к встрече с соответствующими ролями.
     /// В случае неверных данных (например, превышение лимита участников), создание встречи будет отменено.
     /// </remarks>
-    /// <param name="meetDto">Объект с данными для создания встречи. Может включать массив участников.</param>
+    /// <param name="createMeetDto">Объект с данными для создания встречи. Может включать массив участников.</param>
     /// <returns>Информация о созданной встрече (MeetResponseDto).</returns>
     [HttpPost]
     [Authorize(Roles = "User")]
@@ -120,24 +112,19 @@ public class MeetsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<MeetResponseDto>> CreateMeet([FromBody] MeetCreateDto meetDto)
+    public async Task<ActionResult<ResponseMeetDto>> CreateMeet([FromBody] CreateMeetDto createMeetDto)
     {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-        if (userIdClaim == null) { return Unauthorized(); }
-
-        var userId = int.Parse(userIdClaim.Value);
-        
-        if (MeetService.ShiftLimit(meetDto))
+        if (MeetService.ShiftLimit(createMeetDto))
         {
-            return BadRequest($"Количество участников превышено, допустимо: {meetDto.LimitMembers}.");
+            return BadRequest($"Количество участников превышено, допустимо: {createMeetDto.LimitMembers}.");
         }
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
         try
         {
-            var meet = await _meetRepository.CreateMeetAsync(meetDto, userId);
-            await _memberRepository.CreateMemberWithMeet(meetDto, meet);
+            var meet = await _meetRepository.CreateMeetAsync(createMeetDto);
+            await _memberRepository.CreateMemberWithMeet(createMeetDto, meet);
             await transaction.CommitAsync();
             var createdMeet = await _meetRepository.GetMeetByUidAsync(meet.Uid);
 
@@ -161,7 +148,7 @@ public class MeetsController : ControllerBase
     /// Если встреча с таким UID не найдена, возвращается ошибка. Также предусмотрена обработка ошибок конкурентных обновлений.
     /// </remarks>
     /// <param name="uid">Уникальный идентификатор встречи (GUID).</param>
-    /// <param name="meetDto">Объект с новыми данными для обновления встречи.</param>
+    /// <param name="updateMeetDto">Объект с новыми данными для обновления встречи.</param>
     /// <returns>Результат обновления. При успешном обновлении возвращается код 204 No Content, если встреча была найдена и обновлена.</returns>
     /// <response code="204">Возвращается, если встреча была успешно обновлена.</response>
     /// <response code="400">Возвращается, если встреча с указанным идентификатором не найдена или данные запроса некорректны.</response>
@@ -172,7 +159,7 @@ public class MeetsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> UpdateMeet([FromRoute] Guid uid, [FromBody] MeetUpdateDto meetDto)
+    public async Task<IActionResult> UpdateMeet([FromRoute] Guid uid, [FromBody] UpdateMeetDto updateMeetDto)
     {
 
         try
@@ -180,7 +167,7 @@ public class MeetsController : ControllerBase
             var meet = await _meetRepository.GetMeetByUidOrNullAsync(uid);
             if (meet == null) { return BadRequest("Встречи с указаным идентификатором не найдено."); }
             
-            await _meetRepository.UpdateMeetAsync(meetDto, meet);
+            await _meetRepository.UpdateMeetAsync(updateMeetDto, meet);
             
             return NoContent();
         }

@@ -1,11 +1,10 @@
 using ease_intro_api.Core.Services;
-using ease_intro_api.Data;
 using ease_intro_api.DTOs.Meet;
 using ease_intro_api.DTOs.Member;
 using ease_intro_api.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace ease_intro_api.Core.Repository;
+namespace ease_intro_api.Data.Repository;
 
 public class MemberRepository
 {
@@ -49,12 +48,12 @@ public class MemberRepository
     {
         return await GetMembersQuery().FirstAsync(x => x.Id == id);
     }
-
-    /**
-     * Найти, и вернуть участника встречи по идентификатору, если такой имеется.
-     * <param name="id">Идентификатор встречи.</param>
-     * <returns>Возвращает найденую данные участника, либо <b>null</b>.</returns>
-     */
+    
+    /// <summary>
+    /// Найти, и вернуть участника встречи по идентификатору, если такой имеется.
+    /// </summary>
+    /// <param name="id">Идентификатор усатника.</param>
+    /// <returns>Возвращает найденую данные участника, либо <b>null</b>.</returns>
     public async Task<Member?> GetMemberByIdOrNullAsync(int id)
     {
         return await GetMembersQuery().FirstOrDefaultAsync(x => x.Id == id);
@@ -75,7 +74,7 @@ public class MemberRepository
             Contact = dto.Contact,
             MeetGuid = dto.MeetUid,
             Role = Member.MemberRole.Guest,
-            QrCode = ProcessingQr.GenerateQr(dto.MeetUid)
+            QrCode = ProcessingQrService.GenerateQr(dto.MeetUid)
         };
 
         _context.Member.Add(member);
@@ -84,18 +83,18 @@ public class MemberRepository
         return member;
     }
 
-    public async Task CreateMemberWithMeet(MeetCreateDto meetDto, Meet meet)
+    public async Task CreateMemberWithMeet(CreateMeetDto createMeetDto, Meet meet)
     {
-        if (meetDto.Members != null && meetDto.Members.Any())
+        if (createMeetDto.Members != null && createMeetDto.Members.Any())
         {
-            var members = meetDto.Members.Select(m => new Member
+            var members = createMeetDto.Members.Select(m => new Member
             {
                 Name = m.Name,
                 Companion = m.Companion,
                 Contact = m.Contact,
                 Role = m.Role ?? Member.MemberRole.Guest,
                 MeetGuid = meet.Uid,
-                QrCode = ProcessingQr.GenerateQr(meet.Uid)
+                QrCode = ProcessingQrService.GenerateQr(meet.Uid)
             }).ToList();
                 
             _context.Member.AddRange(members);

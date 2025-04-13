@@ -28,10 +28,10 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("register")]
-    public async Task<IActionResult> Register(RegisterDto dto)
+    public async Task<IActionResult> Register(RegisterUserDto dto)
     {
         if (await _context.Users.AnyAsync(u => u.UserEmail == dto.UserEmail))
-            return BadRequest("User already exists");
+            return BadRequest("Такой email уже зарегистрирован.");
 
         var hashedPassword = BCrypt.Net.BCrypt.HashPassword(dto.Password);
         var user = new User
@@ -45,15 +45,15 @@ public class AuthController : ControllerBase
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
 
-        return Ok("User registered");
+        return Ok("Пользователь успешно зарегистрирован.");
     }
 
     [HttpPost("login")]
-    public async Task<IActionResult> Login(LoginDto dto)
+    public async Task<IActionResult> Login(LoginUserDto dto)
     {
         var user = await _context.Users.SingleOrDefaultAsync(u => u.UserEmail == dto.UserEmail);
         if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
-            return Unauthorized("Invalid credentials");
+            return Unauthorized("Недействительные учетные данные.");
 
         var token = GenerateJwtToken(user);
         return Ok(new { token });

@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace ease_intro_api.DTOs.User;
 
-public class LoginDto
+public class LoginUserDto
 {
     [Required]
     [EmailAddress]

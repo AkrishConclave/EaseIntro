@@ -3,7 +3,7 @@ using System.Text;
 
 namespace ease_intro_api.Core.Services;
 
-public class ProcessingQr
+public class ProcessingQrService
 {
     /// <summary>
     /// Создает исходную строку для QR-кода.

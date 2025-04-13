@@ -3,7 +3,7 @@ using ease_intro_api.DTOs.User;
 
 namespace ease_intro_api.DTOs.Meet;
 
-public class MeetResponseDto
+public class ResponseMeetDto
 {
     public Guid Uid { get; set; }
     public string Title { get; set; } = string.Empty;
@@ -12,7 +12,7 @@ public class MeetResponseDto
     public MeetStatusDto? Status { get; set; }
     public int LimitMembers { get; set; }
     public bool AllowedPlusOne { get; set; }
-    public List<MemberResponseDto> Members { get; set; } = new();
-    public UserResponseDto Owner { get; set; } = new();
+    public List<ResponseMemberDto> Members { get; set; } = new();
+    public ResponseUserDto Owner { get; set; } = new();
 
 }

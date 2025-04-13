@@ -8,9 +8,9 @@ namespace ease_intro_api.Mappers;
 
 public static class MemberMapper
 {
-    public static MemberResponseDto MapToDto(Member member)
+    public static ResponseMemberDto MapToDto(Member member)
     {
-        return new MemberResponseDto
+        return new ResponseMemberDto
         {
             Name = member.Name,
             Companion = member.Companion,
@@ -21,9 +21,9 @@ public static class MemberMapper
         };
     }
 
-    private static MeetResponseDto MapMeetToDto(Meet meet)
+    private static ResponseMeetDto MapMeetToDto(Meet meet)
     {
-        return new MeetResponseDto
+        return new ResponseMeetDto
         {
             Uid = meet.Uid,
             Title = meet.Title,
@@ -36,9 +36,9 @@ public static class MemberMapper
         };
     }
 
-    private static UserResponseDto MapUserToDto(User user)
+    private static ResponseUserDto MapUserToDto(User user)
     {
-        return new UserResponseDto
+        return new ResponseUserDto
         {
             PublicName = user.PublicName,
             PublicContact = user.PublicContact

@@ -1,5 +1,4 @@
-using System.Security.Claims;
-using ease_intro_api.Core.Repository;
+using ease_intro_api.Data.Repository;
 using ease_intro_api.Core.Services;
 using Microsoft.AspNetCore.Mvc;
 using ease_intro_api.Data;
@@ -57,7 +56,7 @@ public class MembersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<MemberResponseDto>> CreateMember([FromBody] CreateMemberDto dto)
+    public async Task<ActionResult<ResponseMemberDto>> CreateMember([FromBody] CreateMemberDto dto)
     {
         try
         {
@@ -88,21 +87,17 @@ public class MembersController : ControllerBase
     /// Возвращает 404 Not Found, если участник не найден.
     /// Возвращает 500 Internal Server Error, если произошла ошибка на сервере.
     /// </returns>
-    [HttpGet("{id}")]
+    [HttpGet("{id:int}")]
     [Authorize(Roles = "User")]
-    [ProducesResponseType(typeof(MemberResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ResponseMemberDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails),StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails),StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails),StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<MemberResponseDto>> GetMember(int id)
+    public async Task<ActionResult<ResponseMemberDto>> GetMember(int id)
     {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-        if (userIdClaim == null) { return Unauthorized(); }
-        var userId = int.Parse(userIdClaim.Value);
-        
         try
         {
-            var member = await _memberService.ShowMemberByIdOrNullAsync(id, userId);
+            var member = await _memberService.ShowMemberByIdOrNullAsync(id);
             if (member == null) { return NotFound("Не найден участник с данным идентификатором в ваших встречах."); }
             
             return Ok(MemberMapper.MapToDto(member));
@@ -133,6 +128,7 @@ public class MembersController : ControllerBase
     /// - 404 Not Found, если участник с данным идентификатором не найден в рамках встречи.
     /// </returns>
     [HttpPut("{id}")]
+    [Authorize(Roles = "User")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -140,13 +136,9 @@ public class MembersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateMember(int id, [FromBody] UpdateMemberDto dto)
     {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-        if (userIdClaim == null) { return Unauthorized(); }
-        var userId = int.Parse(userIdClaim.Value);
-        
         try
         {
-            var member = await _memberService.ShowMemberByIdOrNullAsync(id, userId);
+            var member = await _memberService.ShowMemberByIdOrNullAsync(id);
             if (member == null) { return NotFound("Не найден участник с данным идентификатором в ваших встречах."); }
             await _memberRepository.UpdateMemberAsync(dto, member);
             
@@ -159,6 +151,15 @@ public class MembersController : ControllerBase
         }
     }
     
+    /// <summary>
+    /// Удаление участника по идентификатору.
+    /// </summary>
+    /// <remarks>
+    /// Этот метод удаляет участника по его идентификатору (ID). 
+    /// Если участника с указанным идентификатором не найдено, возвращается ошибка.
+    /// </remarks>
+    /// <param name="id">Уникальный идентификатор участника.</param>
+    /// <returns>Результат удаления. При успешном удалении возвращается код 204 No Content.</returns>
     [HttpDelete("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -193,7 +194,7 @@ public class MembersController : ControllerBase
     /// Возвращает 500 Internal Server Error, если произошла ошибка на сервере.
     /// </returns>
     [HttpGet("qrcode/{qrcode}")]
-    [ProducesResponseType(typeof(MemberResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ResponseMemberDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)] 
     public async Task<IActionResult> GetMemberByQr(string qrcode)
@@ -233,7 +234,7 @@ public class MembersController : ControllerBase
     {
         try
         {
-            byte[] pngBytes = ProcessingQr.GenerateQrPng($"{_url}{qrcode}");
+            byte[] pngBytes = ProcessingQrService.GenerateQrPng($"{_url}{qrcode}");
             return File(pngBytes, "image/png");
         }
         catch (Exception ex)
@@ -263,7 +264,7 @@ public class MembersController : ControllerBase
     {
         try
         {
-            byte[] pngBytes = ProcessingQr.GenerateQrPng($"{_url}{qrcode}");
+            byte[] pngBytes = ProcessingQrService.GenerateQrPng($"{_url}{qrcode}");
             return File(pngBytes, "image/png", "QR код для предъявления.");
         }
         catch (Exception ex)
