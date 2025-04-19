@@ -163,3 +163,4 @@
 /Users/akcent/Documents/asp.net/ease_intro_api/obj/Debug/net9.0/ease_intro_api.pdb
 /Users/akcent/Documents/asp.net/ease_intro_api/obj/Debug/net9.0/ease_intro_api.genruntimeconfig.cache
 /Users/akcent/Documents/asp.net/ease_intro_api/obj/Debug/net9.0/ref/ease_intro_api.dll
+/Users/akcent/Documents/asp.net/ease_intro_api/obj/Debug/net9.0/ease_intro_api.sourcelink.json

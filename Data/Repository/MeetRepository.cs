@@ -46,6 +46,16 @@ public class MeetRepository
     }
     
     /// <summary>
+    /// Получить встречу по идентификатору, если такая имеется. Публичный метод, не для обновления или создания
+    /// </summary>
+    /// <param name="uid">Идентификатор встречи.</param>
+    /// <returns>Возвращает найденую встречу, либо <b>null</b>.</returns>
+    public async Task<Meet?> PublicGetMeetByUidOrNullAsync(Guid uid)
+    {
+        return await GetMeetsQuery().FirstOrDefaultAsync(m => m.Uid == uid);
+    }
+    
+    /// <summary>
     /// Получить встречу по ее идентификатору, если мы точно уверены что она есть, иначе выкинет исключение/
     /// </summary>
     /// <param name="uid">Идентификатор встречи.</param>

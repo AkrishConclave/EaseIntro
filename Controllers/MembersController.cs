@@ -60,7 +60,7 @@ public class MembersController : ControllerBase
     {
         try
         {
-            var meet = await _meetRepository.GetMeetByUidOrNullAsync(dto.MeetUid);
+            var meet = await _meetRepository.PublicGetMeetByUidOrNullAsync(dto.MeetUid);
             if (meet == null) { return NotFound("Встречи с указаным идентификатором не найдено."); }
             var member = await _memberRepository.CreateMember(dto);
             

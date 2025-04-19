@@ -83,7 +83,7 @@ public class MeetsController : ControllerBase
     {
         try
         {
-            var meet = await _meetRepository.GetMeetByUidOrNullAsync(uid);
+            var meet = await _meetRepository.PublicGetMeetByUidOrNullAsync(uid);
             
             if (meet == null) { return BadRequest("Встречи с указаным идентификатором не найдено."); }
             return Ok(MeetMapper.MapToDto(meet));
