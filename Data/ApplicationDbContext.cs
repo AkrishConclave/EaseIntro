@@ -26,5 +26,10 @@ public class ApplicationDbContext : DbContext
             .HasMany(m => m.Members)
             .WithOne(m => m.Meet)
             .HasForeignKey(m => m.MeetGuid);
+        
+        
+        modelBuilder.Entity<Member>()
+            .HasIndex(u => u.Contact)
+            .IsUnique();
     }
 }

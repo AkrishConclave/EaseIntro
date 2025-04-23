@@ -5,6 +5,7 @@ using ease_intro_api.Data;
 using ease_intro_api.DTOs.Member;
 using Microsoft.AspNetCore.Authorization;
 using ease_intro_api.Mappers;
+using Microsoft.EntityFrameworkCore;
 
 namespace ease_intro_api.Controllers;
 
@@ -60,6 +61,7 @@ public class MembersController : ControllerBase
     {
         try
         {
+            if (await _memberRepository.CheckExistsContactAsync(dto.Contact)) { return NotFound("Контакт с такой почтой уже зарегистрирован."); }
             var meet = await _meetRepository.PublicGetMeetByUidOrNullAsync(dto.MeetUid);
             if (meet == null) { return NotFound("Встречи с указаным идентификатором не найдено."); }
             var member = await _memberRepository.CreateMember(dto);
@@ -179,6 +181,34 @@ public class MembersController : ControllerBase
             return StatusCode(500, "Internal server error");
         }
     }
+    
+    /// <summary>
+    /// Получить информацию об участнике по его контакту.
+    /// </summary>
+    /// <remarks>
+    /// Этот метод позволяет получить данные о конкретном участнике.
+    /// Если участник не найден, будет возвращен соответствующий HTTP-ответ.
+    /// </remarks>
+    /// <param name="contact">Контакт участника, для которого требуется получить информацию.</param>
+    /// <returns>
+    /// Возвращает информацию об участнике в случае успешного выполнения (200 OK).
+    /// Возвращает 500 Internal Server Error, если произошла ошибка на сервере.
+    /// </returns>
+    [HttpGet("participant/{contact}")]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)] 
+    public async Task<IActionResult> GetMemberMeets(string contact)
+    {
+        try
+        {
+            var member = await _memberRepository.GetMemberByContactAsync(contact);
+            return Ok(MemberMapper.MapToDto(member));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка в процессе получения участника встречи по указанному контакту.");
+            return StatusCode(500, "Internal server error");
+        }
+    }    
     
     /// <summary>
     /// Получить информацию об участнике по QR-коду.

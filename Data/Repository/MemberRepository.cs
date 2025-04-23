@@ -43,10 +43,23 @@ public class MemberRepository
     /// <param name="id">Идентификатор встречи.</param>
     /// <returns>Возвращает найденую встречу.</returns>
     /// <exception cref="InvalidOperationException">Если сработает исключение, пользователь увидет -<br/>
-    /// <i>'Status 500, internal server error'</i></exception>>
+    /// <i>'Status 500, internal server error'</i></exception>
     public async Task<Member> GetMemberByIdAsync(int id)
     {
         return await GetMembersQuery().FirstAsync(x => x.Id == id);
+    }
+    
+    /// <summary>
+    /// Найти, и вернуть участника встречи по контакту, если мы точно уверены
+    /// что он есть, иначе выкинет исключение.
+    /// </summary>
+    /// <param name="contact">Контакт учатника.</param>
+    /// <returns>Возвращает найденого участника.</returns>
+    /// <exception cref="InvalidOperationException">Если сработает исключение, пользователь увидет -<br/>
+    /// <i>'Status 500, internal server error'</i></exception>
+    public async Task<Member> GetMemberByContactAsync(string contact)
+    {
+        return await GetMembersQuery().FirstAsync(x => x.Contact == contact);
     }
     
     /// <summary>
@@ -110,5 +123,15 @@ public class MemberRepository
         member.Role = (Member.MemberRole)dto.Role!.Value;
         
         await _context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Быстрый метод проверки на существование записи
+    /// </summary>
+    /// <param name="contact">Email пользователя</param>
+    /// <returns>bool</returns>
+    public async Task<bool> CheckExistsContactAsync(string contact)
+    {
+        return await _context.Member.AnyAsync(x => x.Contact == contact);
     }
 }

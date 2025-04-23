@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace ease_intro_api.DTOs.Member;
 
@@ -18,5 +19,6 @@ public class CreateMemberDto
     public string Contact { get; set; } = null!;
     
     [Required]
+    [JsonPropertyName("meetUid")]
     public Guid MeetUid { get; set; }
 }
