@@ -57,9 +57,11 @@ public class MemberRepository
     /// <returns>Возвращает найденого участника.</returns>
     /// <exception cref="InvalidOperationException">Если сработает исключение, пользователь увидет -<br/>
     /// <i>'Status 500, internal server error'</i></exception>
-    public async Task<Member> GetMemberByContactAsync(string contact)
+    public async Task<List<Member>> GetMemberByContactAsync(string contact)
     {
-        return await GetMembersQuery().FirstAsync(x => x.Contact == contact);
+        return await GetMembersQuery()
+            .Where(x => x.Contact == contact)
+            .ToListAsync();
     }
     
     /// <summary>

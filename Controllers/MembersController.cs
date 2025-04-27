@@ -200,15 +200,17 @@ public class MembersController : ControllerBase
     {
         try
         {
-            var member = await _memberRepository.GetMemberByContactAsync(contact);
-            return Ok(MemberMapper.MapToDto(member));
+            var members = await _memberRepository.GetMemberByContactAsync(contact);
+            var membersDto = members.Select(MemberMapper.MapToDto).ToList();
+        
+            return Ok(membersDto);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка в процессе получения участника встречи по указанному контакту.");
+            _logger.LogError(ex, "Ошибка в процессе получения участников встречи по указанному контакту.");
             return StatusCode(500, "Internal server error");
         }
-    }    
+    }
     
     /// <summary>
     /// Получить информацию об участнике по QR-коду.
