@@ -152,10 +152,8 @@ namespace ease_intro_api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Contact")
+                    b.HasIndex("MeetGuid", "Contact")
                         .IsUnique();
-
-                    b.HasIndex("MeetGuid");
 
                     b.ToTable("Member");
                 });

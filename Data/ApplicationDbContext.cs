@@ -29,7 +29,7 @@ public class ApplicationDbContext : DbContext
         
         
         modelBuilder.Entity<Member>()
-            .HasIndex(u => u.Contact)
+            .HasIndex(u => new { u.MeetGuid, u.Contact })
             .IsUnique();
     }
 }

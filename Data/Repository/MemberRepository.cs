@@ -131,9 +131,10 @@ public class MemberRepository
     /// Быстрый метод проверки на существование записи
     /// </summary>
     /// <param name="contact">Email пользователя</param>
+    /// <param name="meetUid">Номер встречи</param>
     /// <returns>bool</returns>
-    public async Task<bool> CheckExistsContactAsync(string contact)
+    public async Task<bool> CheckExistsContactAsync(string contact, Guid meetUid)
     {
-        return await _context.Member.AnyAsync(x => x.Contact == contact);
+        return await _context.Member.AnyAsync(x => x.Contact == contact && x.MeetGuid == meetUid);
     }
 }

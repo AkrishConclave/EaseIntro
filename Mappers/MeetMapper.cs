@@ -27,7 +27,8 @@ public static class MeetMapper
                 Contact = m.Contact,
                 Role = m.Role.ToString(),
                 QrCode = m.QrCode
-            }).ToList() ?? new List<ResponseMemberDto>()
+            })
+                .ToList() ?? new List<ResponseMemberDto>()
         };
     }
 

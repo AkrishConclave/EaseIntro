@@ -37,7 +37,7 @@ public class MembersController : ControllerBase
         _memberService = memberService;
         _meetRepository = meetRepository;
         
-        _url = "https://your-domain.com/api/members/qrcode/";
+        _url = "https://ei-api.abdera.tech/api/members/qrcode/";
     }
     
     /// <summary>
@@ -61,7 +61,7 @@ public class MembersController : ControllerBase
     {
         try
         {
-            if (await _memberRepository.CheckExistsContactAsync(dto.Contact)) { return NotFound("Контакт с такой почтой уже зарегистрирован."); }
+            if (await _memberRepository.CheckExistsContactAsync(dto.Contact, dto.MeetUid)) { return NotFound("Контакт с такой почтой уже зарегистрирован."); }
             var meet = await _meetRepository.PublicGetMeetByUidOrNullAsync(dto.MeetUid);
             if (meet == null) { return NotFound("Встречи с указаным идентификатором не найдено."); }
             var member = await _memberRepository.CreateMember(dto);

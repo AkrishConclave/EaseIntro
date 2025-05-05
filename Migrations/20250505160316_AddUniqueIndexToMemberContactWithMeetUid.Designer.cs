@@ -12,8 +12,8 @@ using ease_intro_api.Data;
 namespace ease_intro_api.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250422184704_AddUniqueIndexToMemberContact")]
-    partial class AddUniqueIndexToMemberContact
+    [Migration("20250505160316_AddUniqueIndexToMemberContactWithMeetUid")]
+    partial class AddUniqueIndexToMemberContactWithMeetUid
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -155,10 +155,8 @@ namespace ease_intro_api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Contact")
+                    b.HasIndex("MeetGuid", "Contact")
                         .IsUnique();
-
-                    b.HasIndex("MeetGuid");
 
                     b.ToTable("Member");
                 });
