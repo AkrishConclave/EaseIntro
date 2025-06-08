@@ -54,3 +54,6 @@ CodeCoverage/
 TestResult.xml
 nunit-*.xml
 .idea
+
+# Локальные настройки
+appsettings.Development.json
