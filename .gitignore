@@ -57,3 +57,6 @@ nunit-*.xml
 
 # Локальные настройки
 appsettings.Development.json
+
+# JetBrains Rider
+*.DotSettings.user
