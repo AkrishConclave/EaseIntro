@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using ease_intro_api.Data.Repository;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -155,6 +156,7 @@ public class MeetsController : ControllerBase
     /// <response code="404">Возвращается, если встреча была удалена или не существует в базе данных.</response>
     /// <response code="500">Возвращается, если произошла ошибка при обновлении встречи на сервере.</response>
     [HttpPut("{uid:guid}")]
+    [Authorize(Roles = "User")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -197,23 +199,39 @@ public class MeetsController : ControllerBase
     /// <response code="404">Возвращается, если встреча с указанным идентификатором не найдена.</response>
     /// <response code="500">Возвращается, если произошла ошибка при удалении встречи на сервере.</response>
     [HttpDelete("{uid:guid}")]
+    [Authorize(Roles = "User")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> DeleteMeet(Guid uid)
     {
         try
         {
             var meet = await _context.Meets.FindAsync(uid);
-            if (meet == null) { return NotFound(); }
+            if (meet == null)
+                return NotFound();
+
+            // Берём ID текущего пользователя из токена
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim))
+                return Forbid();
+
+            if (!int.TryParse(userIdClaim, out var userId))
+                return StatusCode(500, "Некорректный токен (userId не int).");
+
+            // Сравниваем владельца
+            if (meet.OwnerId != userId)
+                return Forbid();
 
             _context.Meets.Remove(meet);
             await _context.SaveChangesAsync();
+
             return NoContent();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка при удалении.");
+            _logger.LogError(ex, "Ошибка при удалении встречи.");
             return StatusCode(500, "Internal server error");
         }
     }

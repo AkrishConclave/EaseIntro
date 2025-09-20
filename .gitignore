@@ -60,3 +60,4 @@ appsettings.Development.json
 
 # JetBrains Rider
 *.DotSettings.user
+/sftp-config.json

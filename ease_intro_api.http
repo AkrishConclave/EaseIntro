@@ -1,17 +1,17 @@
 ### Файл для запуска теста эндпоитов без необходимости использования сторонних программ
 
-@ease_intro_api_HostAddress = http://localhost:5215
+@ease_intro_api_HostAddress = http://localhost:5000
 
 ### Получить все митинги
-GET http://localhost:5215/api/meets
+GET http://localhost:5000/api/meets
 Accept: application/json
 
 ### Получить митинг по ID
-GET http://localhost:5215/api/meets/21219d35-4f0a-4886-ad63-086b24351dbc
+GET http://localhost:5000/api/meets/21219d35-4f0a-4886-ad63-086b24351dbc
 Accept: application/json
 
 ### Создать новый митинг
-POST http://localhost:5215/api/meets
+POST http://localhost:5000/api/meets
 Content-Type: application/json
 
 {
@@ -24,7 +24,7 @@ Content-Type: application/json
 }
 
 ### Создать новый митинг
-POST http://localhost:5215/api/meets
+POST http://localhost:5000/api/meets
 Content-Type: application/json
 
 {
@@ -41,18 +41,18 @@ Content-Type: application/json
 }
 
 ### Удалить митинг
-DELETE http://localhost:5215/api/meets/21219d35-4f0a-4886-ad63-086b24351dbc
+DELETE http://localhost:5000/api/meets/21219d35-4f0a-4886-ad63-086b24351dbc
 
 ### Добавить участника
-GET http://localhost:5215/api/members
+GET http://localhost:5000/api/members
 Content-Type: application/json
 
 ### Добавить участника
-GET http://localhost:5215/api/members/6
+GET http://localhost:5000/api/members/6
 Content-Type: application/json
 
 ### Добавить участника
-POST http://localhost:5215/api/members
+POST http://localhost:5000/api/members
 Content-Type: application/json
 
 {
