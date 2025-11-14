@@ -79,7 +79,24 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 
+// Настройка CORS
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
 var app = builder.Build();
+
+// HTTPS редирект
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 // Включаем Swagger в режиме разработки
 if (app.Environment.IsDevelopment())
@@ -87,6 +104,12 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+// CORS должен быть до Authentication
+app.UseCors();
+
+// Rate limiting для auth endpoints
+app.UseMiddleware<ease_intro_api.Middleware.RateLimitMiddleware>();
 
 app.UseAuthentication();
 app.UseAuthorization();

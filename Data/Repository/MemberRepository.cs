@@ -137,4 +137,17 @@ public class MemberRepository
     {
         return await _context.Member.AnyAsync(x => x.Contact == contact && x.MeetGuid == meetUid);
     }
+
+    /// <summary>
+    /// Отметить участника как пришедшего
+    /// </summary>
+    /// <param name="member">Участник для отметки</param>
+    /// <returns>Обновленный участник</returns>
+    public async Task<Member> CheckInMemberAsync(Member member)
+    {
+        member.IsCheckedIn = true;
+        member.CheckedInAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+        return member;
+    }
 }

@@ -17,7 +17,9 @@ public static class MemberMapper
             Contact = member.Contact,
             Role = member.Role.ToString(),
             QrCode = member.QrCode,
-            Meet = MapMeetToDto(member.Meet!)
+            IsCheckedIn = member.IsCheckedIn,
+            CheckedInAt = member.CheckedInAt,
+            Meet = member.Meet != null ? MapMeetToDto(member.Meet) : null
         };
     }
 

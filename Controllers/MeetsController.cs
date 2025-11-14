@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ease_intro_api.Data;
 using ease_intro_api.DTOs.Meet;
+using ease_intro_api.DTOs.Member;
 using Microsoft.AspNetCore.Authorization;
 using ease_intro_api.Core.Services;
 using ease_intro_api.Mappers;
@@ -115,6 +116,12 @@ public class MeetsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<ResponseMeetDto>> CreateMeet([FromBody] CreateMeetDto createMeetDto)
     {
+        // Валидация даты - нельзя создавать встречи в прошлом
+        if (createMeetDto.Date < DateTime.UtcNow)
+        {
+            return BadRequest("Нельзя создать встречу с датой в прошлом.");
+        }
+        
         if (MeetService.ShiftLimit(createMeetDto))
         {
             return BadRequest($"Количество участников превышено, допустимо: {createMeetDto.LimitMembers}.");
@@ -159,15 +166,32 @@ public class MeetsController : ControllerBase
     [Authorize(Roles = "User")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> UpdateMeet([FromRoute] Guid uid, [FromBody] UpdateMeetDto updateMeetDto)
     {
-
         try
         {
             var meet = await _meetRepository.GetMeetByUidOrNullAsync(uid);
-            if (meet == null) { return BadRequest("Встречи с указаным идентификатором не найдено."); }
+            if (meet == null) { return NotFound("Встречи с указаным идентификатором не найдено."); }
+            
+            // Проверка владельца встречи
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim))
+                return Forbid();
+
+            if (!int.TryParse(userIdClaim, out var userId))
+                return StatusCode(500, "Некорректный токен (userId не int).");
+
+            if (meet.OwnerId != userId)
+                return Forbid();
+            
+            // Валидация даты - нельзя создавать встречи в прошлом
+            if (updateMeetDto.Date < DateTime.UtcNow)
+            {
+                return BadRequest("Нельзя установить дату встречи в прошлом.");
+            }
             
             await _meetRepository.UpdateMeetAsync(updateMeetDto, meet);
             
@@ -182,6 +206,173 @@ public class MeetsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Ошибка обновления встречи с указаным идентификатором.");
+            return StatusCode(500, "Internal server error");
+        }
+    }
+
+    /// <summary>
+    /// Получить список участников встречи.
+    /// </summary>
+    /// <remarks>
+    /// Этот метод возвращает список всех участников конкретной встречи. Доступен только владельцу встречи.
+    /// </remarks>
+    /// <param name="uid">Уникальный идентификатор встречи (GUID).</param>
+    /// <returns>Список участников встречи.</returns>
+    [HttpGet("{uid:guid}/members")]
+    [Authorize(Roles = "User")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<IEnumerable<ResponseMemberDto>>> GetMeetMembers(Guid uid)
+    {
+        try
+        {
+            var meet = await _meetRepository.GetMeetByUidOrNullAsync(uid);
+            if (meet == null)
+                return NotFound("Встреча с указанным идентификатором не найдена.");
+            
+            // Проверка владельца
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim))
+                return Forbid();
+
+            if (!int.TryParse(userIdClaim, out var userId))
+                return StatusCode(500, "Некорректный токен (userId не int).");
+
+            if (meet.OwnerId != userId)
+                return Forbid();
+            
+            var members = meet.Members.Select(MemberMapper.MapToDto).ToList();
+            return Ok(members);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка получения участников встречи");
+            return StatusCode(500, "Internal server error");
+        }
+    }
+
+    /// <summary>
+    /// Получить статистику посещаемости встречи.
+    /// </summary>
+    /// <remarks>
+    /// Возвращает список участников, которые пришли на мероприятие, и время их сканирования.
+    /// Доступно только владельцу встречи.
+    /// </remarks>
+    /// <param name="uid">Уникальный идентификатор встречи (GUID).</param>
+    /// <returns>Статистика посещаемости: кто пришел и во сколько.</returns>
+    [HttpGet("{uid:guid}/attendance")]
+    [Authorize(Roles = "User")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult> GetAttendanceStats(Guid uid)
+    {
+        try
+        {
+            var meet = await _meetRepository.GetMeetByUidOrNullAsync(uid);
+            if (meet == null)
+                return NotFound("Встреча с указанным идентификатором не найдена.");
+            
+            // Проверка владельца
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim))
+                return Forbid();
+
+            if (!int.TryParse(userIdClaim, out var userId))
+                return StatusCode(500, "Некорректный токен (userId не int).");
+
+            if (meet.OwnerId != userId)
+                return Forbid();
+            
+            var checkedInMembers = meet.Members
+                .Where(m => m.IsCheckedIn)
+                .OrderBy(m => m.CheckedInAt)
+                .Select(m => new
+                {
+                    name = m.Name,
+                    checkedInAt = m.CheckedInAt!.Value
+                })
+                .ToList();
+            
+            return Ok(new
+            {
+                meetTitle = meet.Title,
+                meetDate = meet.Date,
+                totalCheckedIn = checkedInMembers.Count,
+                members = checkedInMembers
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка получения статистики посещаемости");
+            return StatusCode(500, "Internal server error");
+        }
+    }
+    
+    /// <summary>
+    /// Выгрузить статистику посещаемости в CSV формате.
+    /// </summary>
+    /// <remarks>
+    /// Выгружает статистику посещаемости в CSV файл с полями: имя, дата (время сканирования).
+    /// Доступно только владельцу встречи.
+    /// </remarks>
+    /// <param name="uid">Уникальный идентификатор встречи (GUID).</param>
+    /// <returns>CSV файл со статистикой посещаемости.</returns>
+    [HttpGet("{uid:guid}/attendance/export")]
+    [Authorize(Roles = "User")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult> ExportAttendanceStats(Guid uid)
+    {
+        try
+        {
+            var meet = await _meetRepository.GetMeetByUidOrNullAsync(uid);
+            if (meet == null)
+                return NotFound("Встреча с указанным идентификатором не найдена.");
+            
+            // Проверка владельца
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim))
+                return Forbid();
+
+            if (!int.TryParse(userIdClaim, out var userId))
+                return StatusCode(500, "Некорректный токен (userId не int).");
+
+            if (meet.OwnerId != userId)
+                return Forbid();
+            
+            var checkedInMembers = meet.Members
+                .Where(m => m.IsCheckedIn)
+                .OrderBy(m => m.CheckedInAt)
+                .ToList();
+            
+            // Формируем CSV
+            var csvLines = new List<string>
+            {
+                "Имя,Дата и время сканирования"
+            };
+            
+            foreach (var member in checkedInMembers)
+            {
+                var dateStr = member.CheckedInAt!.Value.ToString("yyyy-MM-dd HH:mm:ss");
+                csvLines.Add($"\"{member.Name}\",\"{dateStr}\"");
+            }
+            
+            var csvContent = string.Join("\n", csvLines);
+            var bytes = System.Text.Encoding.UTF8.GetBytes(csvContent);
+            
+            var fileName = $"attendance_{meet.Title.Replace(" ", "_")}_{DateTime.UtcNow:yyyyMMdd}.csv";
+            
+            return File(bytes, "text/csv", fileName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка выгрузки статистики посещаемости");
             return StatusCode(500, "Internal server error");
         }
     }

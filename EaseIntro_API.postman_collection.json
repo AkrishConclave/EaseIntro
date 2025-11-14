@@ -1,0 +1,520 @@
+{
+	"info": {
+		"_postman_id": "ease-intro-api-collection",
+		"name": "EaseIntro API",
+		"description": "API для управления встречами и участниками",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Register",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userEmail\": \"user@example.com\",\n  \"password\": \"password123\",\n  \"publicName\": \"Иван Иванов\",\n  \"publicContact\": \"ivan@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/register",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "register"]
+						},
+						"description": "Регистрация нового пользователя. Пароль должен содержать минимум 6 символов."
+					},
+					"response": []
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.environment.set(\"authToken\", jsonData.token);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userEmail\": \"user@example.com\",\n  \"password\": \"password123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "login"]
+						},
+						"description": "Вход в систему. Возвращает JWT токен для дальнейшей авторизации."
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints для аутентификации пользователей"
+		},
+		{
+			"name": "Users",
+			"item": [
+				{
+					"name": "Get My Profile",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/users/me",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "users", "me"]
+						},
+						"description": "Получить информацию о текущем авторизованном пользователе."
+					},
+					"response": []
+				},
+				{
+					"name": "Update My Profile",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"publicName\": \"Новое имя\",\n  \"publicContact\": \"newcontact@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/users/me",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "users", "me"]
+						},
+						"description": "Обновить информацию о текущем пользователе (имя и контакт)."
+					},
+					"response": []
+				},
+				{
+					"name": "Change Password",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"oldPassword\": \"password123\",\n  \"newPassword\": \"newpassword123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/users/change-password",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "users", "change-password"]
+						},
+						"description": "Изменить пароль текущего пользователя. Новый пароль должен содержать минимум 6 символов."
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints для управления профилем пользователя"
+		},
+		{
+			"name": "Meets",
+			"item": [
+				{
+					"name": "Get All Meets",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/meets",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "meets"]
+						},
+						"description": "Получить все встречи текущего пользователя (только встречи, созданные пользователем)."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Meet by UID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/meets/{{meetUid}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "meets", "{{meetUid}}"]
+						},
+						"description": "Получить информацию о встрече по её уникальному идентификатору (публичный endpoint)."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Meet",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Деловая встреча\",\n  \"date\": \"2025-12-31T12:00:00Z\",\n  \"location\": \"Москва, офис\",\n  \"statusId\": 1,\n  \"limitMembers\": 10,\n  \"allowedPlusOne\": true,\n  \"members\": [\n    {\n      \"name\": \"Иван Иванов\",\n      \"companion\": \"С супругой\",\n      \"contact\": \"ivan@example.com\",\n      \"role\": 0\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/meets",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "meets"]
+						},
+						"description": "Создать новую встречу. Можно сразу добавить участников. Дата не может быть в прошлом. StatusId: 1-5 (см. документацию)."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Meet",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Обновленное название\",\n  \"date\": \"2025-12-31T14:00:00Z\",\n  \"location\": \"Новое место\",\n  \"statusId\": 2,\n  \"limitMembers\": 15,\n  \"allowedPlusOne\": false\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/meets/{{meetUid}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "meets", "{{meetUid}}"]
+						},
+						"description": "Обновить информацию о встрече. Только владелец может обновлять встречу. Дата не может быть в прошлом."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Meet",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/meets/{{meetUid}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "meets", "{{meetUid}}"]
+						},
+						"description": "Удалить встречу. Только владелец может удалять встречу."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Meet Members",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/meets/{{meetUid}}/members",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "meets", "{{meetUid}}", "members"]
+						},
+						"description": "Получить список всех участников встречи. Доступно только владельцу встречи."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Attendance Stats",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/meets/{{meetUid}}/attendance",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "meets", "{{meetUid}}", "attendance"]
+						},
+						"description": "Получить статистику посещаемости: кто пришел и во сколько. Доступно только владельцу встречи."
+					},
+					"response": []
+				},
+				{
+					"name": "Export Attendance Stats (CSV)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/meets/{{meetUid}}/attendance/export",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "meets", "{{meetUid}}", "attendance", "export"]
+						},
+						"description": "Выгрузить статистику посещаемости в CSV файл (имя, дата сканирования). Доступно только владельцу встречи."
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints для управления встречами"
+		},
+		{
+			"name": "Members",
+			"item": [
+				{
+					"name": "Register Member",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Петр Петров\",\n  \"companion\": \"С супругой\",\n  \"contact\": \"petr@example.com\",\n  \"meetUid\": \"{{meetUid}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/members",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "members"]
+						},
+						"description": "Зарегистрировать участника на встречу. Возвращает уникальный QR-код для участника."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Member by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/members/{{memberId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "members", "{{memberId}}"]
+						},
+						"description": "Получить информацию об участнике по его ID. Доступно только владельцу встречи."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Member",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Обновленное имя\",\n  \"companion\": \"Обновленный спутник\",\n  \"contact\": \"newemail@example.com\",\n  \"role\": 1\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/members/{{memberId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "members", "{{memberId}}"]
+						},
+						"description": "Обновить информацию об участнике. Доступно только владельцу встречи. Role: 0=Main, 1=Admin, 2=Staff, 3=Guest"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Member",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/members/{{memberId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "members", "{{memberId}}"]
+						},
+						"description": "Удалить участника. Доступно только владельцу встречи."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Members by Contact",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/members/participant/{{contact}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "members", "participant", "{{contact}}"]
+						},
+						"description": "Получить все встречи, на которые зарегистрирован участник с указанным контактом (email)."
+					},
+					"response": []
+				},
+				{
+					"name": "Scan Member QR Code",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/members/qrcode/{{qrCode}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "members", "qrcode", "{{qrCode}}"]
+						},
+						"description": "Сканировать QR-код участника для отметки посещения (публичный endpoint, можно просто камерой). Автоматически проверяет время мероприятия и отмечает участника, если время подходящее. Если указано время - можно сканировать за 3 часа до начала. Если только дата - можно в день мероприятия."
+					},
+					"response": []
+				},
+				{
+					"name": "Get QR Code Image",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/members/qrcode/image/{{qrCode}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "members", "qrcode", "image", "{{qrCode}}"]
+						},
+						"description": "Получить изображение QR-кода в формате PNG."
+					},
+					"response": []
+				},
+				{
+					"name": "Download QR Code Image",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/members/qrcode/image/{{qrCode}}/download",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "members", "qrcode", "image", "{{qrCode}}", "download"]
+						},
+						"description": "Скачать изображение QR-кода в формате PNG."
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints для управления участниками встреч"
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000",
+			"type": "string"
+		},
+		{
+			"key": "authToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "meetUid",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "memberId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "qrCode",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "contact",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
+
