@@ -30,6 +30,12 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<IActionResult> Register(RegisterUserDto dto)
     {
+        // Валидация пароля
+        if (string.IsNullOrWhiteSpace(dto.Password) || dto.Password.Length < 6)
+        {
+            return BadRequest("Пароль должен содержать минимум 6 символов.");
+        }
+
         if (await _context.Users.AnyAsync(u => u.UserEmail == dto.UserEmail))
             return BadRequest("Такой email уже зарегистрирован.");
 

@@ -46,4 +46,11 @@ public class Member
     [Required]
     [StringLength(160)]
     public string QrCode { get; set; } = null!;
+    
+    // Отметка о посещении
+    [DefaultValue(false)]
+    public bool IsCheckedIn { get; set; } = false;
+    
+    // Время отметки о посещении
+    public DateTime? CheckedInAt { get; set; }
 }
