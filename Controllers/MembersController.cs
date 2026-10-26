@@ -248,19 +248,40 @@ public class MembersController : ControllerBase
     /// <remarks>
     /// Этот метод позволяет получить данные о конкретном участнике.
     /// Если участник не найден, будет возвращен соответствующий HTTP-ответ.
+    /// Доступно авторизованным пользователям с ролью "User".
+    /// Возвращает билеты пользователя (если contact совпадает с email авторизованного пользователя),
+    /// либо участников встреч, созданных текущим пользователем.
     /// </remarks>
     /// <param name="contact">Контакт участника, для которого требуется получить информацию.</param>
     /// <returns>
     /// Возвращает информацию об участнике в случае успешного выполнения (200 OK).
+    /// Возвращает 401 Unauthorized, если пользователь не авторизован.
     /// Возвращает 500 Internal Server Error, если произошла ошибка на сервере.
     /// </returns>
     [HttpGet("participant/{contact}")]
-    [ProducesResponseType(StatusCodes.Status500InternalServerError)] 
+    [Authorize(Roles = "User")]
+    [ProducesResponseType(typeof(IEnumerable<ResponseMemberDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetMemberMeets(string contact)
     {
         try
         {
+            var currentUserEmail = User.FindFirst(ClaimTypes.Name)?.Value;
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var userId))
+            {
+                return Unauthorized();
+            }
+
             var members = await _memberRepository.GetMemberByContactAsync(contact);
+
+            if (!string.Equals(contact, currentUserEmail, StringComparison.OrdinalIgnoreCase))
+            {
+                members = members.Where(m => m.Meet != null && m.Meet.OwnerId == userId).ToList();
+            }
+
             var membersDto = members.Select(MemberMapper.MapToDto).ToList();
         
             return Ok(membersDto);
