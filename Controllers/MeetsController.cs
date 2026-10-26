@@ -136,13 +136,39 @@ public class MeetsController : ControllerBase
             return BadRequest($"Количество участников превышено, допустимо: {createMeetDto.LimitMembers}.");
         }
 
-        await using var transaction = await _context.Database.BeginTransactionAsync();
+        if (createMeetDto.Members != null && createMeetDto.Members.Any())
+        {
+            var hasDuplicateContacts = createMeetDto.Members
+                .Where(m => !string.IsNullOrWhiteSpace(m.Contact))
+                .Select(m => m.Contact.Trim())
+                .GroupBy(c => c, StringComparer.OrdinalIgnoreCase)
+                .Any(g => g.Count() > 1);
+
+            if (hasDuplicateContacts)
+            {
+                return BadRequest("В списке участников присутствуют дублирующиеся контакты.");
+            }
+
+            if (!createMeetDto.AllowedPlusOne && createMeetDto.Members.Any(m => !string.IsNullOrWhiteSpace(m.Companion)))
+            {
+                return BadRequest("На данную встречу нельзя регистрироваться со спутником (+1).");
+            }
+        }
+
+        Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction = null;
+        if (_context.Database.IsRelational())
+        {
+            transaction = await _context.Database.BeginTransactionAsync();
+        }
 
         try
         {
             var meet = await _meetRepository.CreateMeetAsync(createMeetDto);
             await _memberRepository.CreateMemberWithMeet(createMeetDto, meet);
-            await transaction.CommitAsync();
+            if (transaction != null)
+            {
+                await transaction.CommitAsync();
+            }
             var createdMeet = await _meetRepository.GetMeetByUidAsync(meet.Uid);
 
             return CreatedAtAction(nameof(GetMeet), 
@@ -151,9 +177,19 @@ public class MeetsController : ControllerBase
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
+            if (transaction != null)
+            {
+                await transaction.RollbackAsync();
+            }
             _logger.LogError(ex, "Ошибка при создании встречи");
             return StatusCode(500, "Internal server error");
+        }
+        finally
+        {
+            if (transaction != null)
+            {
+                await transaction.DisposeAsync();
+            }
         }
     }
 

@@ -22,7 +22,7 @@ public class MeetService
     
     public static bool ShiftLimit(CreateMeetDto createMeetDto)
     {
-        var count = createMeetDto.Members!.Count;
+        var count = createMeetDto.Members?.Count ?? 0;
         return createMeetDto.LimitMembers != 0 && count > createMeetDto.LimitMembers;
     }
     

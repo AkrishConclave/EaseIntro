@@ -17,7 +17,7 @@ public class CreateMeetDto
     public string Location { get; set; } =  string.Empty;
 
     [Required]
-    [Range(1, 4, ErrorMessage = "Не верно выбран статус встречи.")]
+    [Range(1, 5, ErrorMessage = "Неверно выбран статус встречи.")]
     public int StatusId { get; set; }
     
     [Range(0, int.MaxValue, ErrorMessage = "Значение должно быть больше или равно 0.")]
