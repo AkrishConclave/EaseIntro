@@ -8,9 +8,8 @@ public class CreateMemberWithMeetDto
     [StringLength(80)]
     public string Name { get; set; } = null!;
     
-    [Required]
     [StringLength(80)]
-    public string Companion { get; set; } = string.Empty;
+    public string? Companion { get; set; } = string.Empty;
     
     [Required]
     [EmailAddress]
