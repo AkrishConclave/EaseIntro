@@ -51,7 +51,14 @@ public class AuthController : ControllerBase
         };
 
         _context.Users.Add(user);
-        await _context.SaveChangesAsync();
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            return Conflict("Такой email уже зарегистрирован.");
+        }
 
         return Ok("Пользователь успешно зарегистрирован.");
     }
