@@ -208,6 +208,11 @@ public class MembersController : ControllerBase
         if (meet.OwnerId != _userContextService.UserId)
             return Forbid();
 
+        if (!meet.AllowedPlusOne && !string.IsNullOrWhiteSpace(dto.Companion))
+        {
+            return BadRequest("На данную встречу нельзя добавлять спутника (+1).");
+        }
+
         if (!string.IsNullOrWhiteSpace(dto.Contact) && !string.Equals(dto.Contact, member.Contact, StringComparison.OrdinalIgnoreCase))
         {
             if (await _memberRepository.CheckExistsContactAsync(dto.Contact, member.MeetGuid))

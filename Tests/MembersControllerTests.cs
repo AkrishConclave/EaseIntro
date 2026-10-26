@@ -476,4 +476,61 @@ public class MembersControllerTests
         var conflictResult = Assert.IsType<ConflictObjectResult>(result);
         Assert.Equal("Контакт с такой почтой уже зарегистрирован.", conflictResult.Value);
     }
+
+    [Fact]
+    public async Task UpdateMember_CompanionNotAllowed_Returns400BadRequest()
+    {
+        var dbName = Guid.NewGuid().ToString();
+        using var context = GetDbContext(dbName);
+
+        context.Users.Add(CreateOwnerUser());
+
+        var status = new MeetStatus { Id = 1, Title = "Встреча запланирована" };
+        context.MeetStatus.Add(status);
+
+        var meetUid = Guid.NewGuid();
+        var meet = new Meet
+        {
+            Uid = meetUid,
+            Title = "Test Meet",
+            Date = DateTime.UtcNow.AddDays(1),
+            Location = "Test Room",
+            StatusId = 1,
+            Status = status,
+            LimitMembers = 10,
+            AllowedPlusOne = false,
+            OwnerId = 1
+        };
+        context.Meets.Add(meet);
+
+        var member = new Member
+        {
+            Id = 1,
+            Name = "John Doe",
+            Contact = "john@example.com",
+            MeetGuid = meetUid,
+            QrCode = "QR111"
+        };
+        context.Member.Add(member);
+        await context.SaveChangesAsync();
+
+        var userContextMock = GetUserContextMock(1);
+        var meetRepo = new MeetRepository(context, userContextMock.Object);
+        var memberRepo = new MemberRepository(context);
+        var memberService = new MemberService(memberRepo, meetRepo, userContextMock.Object);
+        var loggerMock = new Mock<ILogger<MembersController>>();
+        var configMock = new Mock<IConfiguration>();
+
+        var controller = new MembersController(context, loggerMock.Object, memberRepo, memberService, meetRepo, configMock.Object, userContextMock.Object);
+
+        var dto = new UpdateMemberDto
+        {
+            Companion = "Jane Doe"
+        };
+
+        var result = await controller.UpdateMember(1, dto);
+
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal("На данную встречу нельзя добавлять спутника (+1).", badRequestResult.Value);
+    }
 }
