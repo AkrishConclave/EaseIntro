@@ -93,6 +93,30 @@ API построен на проверенных технологиях и сл�
 4. Создайте первое мероприятие — протестируйте основные функции
 5. Интегрируйте в своё приложение — используйте API для ваших нужд
 
+## Конфигурация и секреты
+
+Секретные данные (строка подключения к базе данных `ConnectionStrings:DefaultConnection` и секретный ключ `Jwt:Key`) вынесены из файла `appsettings.json`.
+
+Настроить их можно следующими способами:
+
+### 1. Локальная разработка (`dotnet user-secrets`)
+
+Для локальной разработки используйте инструмент `dotnet user-secrets`:
+
+```bash
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "server=localhost;port=3306;database=abdera;user=abdera;password=123"
+dotnet user-secrets set "Jwt:Key" "ВАШ_СЕКРЕТНЫЙ_КЛЮЧ_JWT"
+```
+
+### 2. Переменные окружения (`Environment Variables`)
+
+Для продакшена или Docker-контейнеров используйте переменные окружения:
+
+```bash
+export ConnectionStrings__DefaultConnection="server=localhost;port=3306;database=abdera;user=abdera;password=123"
+export Jwt__Key="ВАШ_СЕКРЕТНЫЙ_КЛЮЧ_JWT"
+```
+
 ## Технические детали
 
 API построен на ASP.NET Core и предоставляет RESTful интерфейс. Поддерживается JWT-аутентификация для защищённых эндпоинтов. Все данные передаются в формате JSON. Подробная техническая документация доступна в отдельных файлах проекта.
