@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using ease_intro_api.Data.Repository;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -7,6 +6,7 @@ using ease_intro_api.DTOs.Meet;
 using ease_intro_api.DTOs.Member;
 using Microsoft.AspNetCore.Authorization;
 using ease_intro_api.Core.Services;
+using ease_intro_api.Core.Services.Interfaces;
 using ease_intro_api.Mappers;
 
 namespace ease_intro_api.Controllers;
@@ -20,6 +20,7 @@ public class MeetsController : ControllerBase
     private readonly MeetService _meetService;
     private readonly MeetRepository _meetRepository;
     private readonly MemberRepository _memberRepository;
+    private readonly IUserContextService _userContextService;
 
     public MeetsController
     (
@@ -27,7 +28,8 @@ public class MeetsController : ControllerBase
         ILogger<MeetsController> logger,
         MeetService meetService,
         MeetRepository meetRepository,
-        MemberRepository memberRepository
+        MemberRepository memberRepository,
+        IUserContextService userContextService
     )
     {
         _context = context;
@@ -35,6 +37,7 @@ public class MeetsController : ControllerBase
         _meetService = meetService;
         _meetRepository = meetRepository;
         _memberRepository = memberRepository;
+        _userContextService = userContextService;
     }
     
     /// <summary>
@@ -58,15 +61,7 @@ public class MeetsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<IEnumerable<ResponseMeetDto>>> GetMeets()
     {
-        try
-        {
-            return Ok(await _meetService.ShowAllMeetsAsync());
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Ошибка получения встреч");
-            return StatusCode(500, "Internal server error");
-        }
+        return Ok(await _meetService.ShowAllMeetsAsync());
     }
 
     /// <summary>
@@ -85,25 +80,16 @@ public class MeetsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> GetMeet(Guid uid)
     {
-        try
-        {
-            var meet = await _meetRepository.PublicGetMeetByUidOrNullAsync(uid);
-            
-            if (meet == null) { return NotFound("Встречи с указаным идентификатором не найдено."); }
+        var meet = await _meetRepository.PublicGetMeetByUidOrNullAsync(uid);
 
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (!string.IsNullOrEmpty(userIdClaim) && int.TryParse(userIdClaim, out var userId) && meet.OwnerId == userId)
-            {
-                return Ok(MeetMapper.MapToDto(meet));
-            }
+        if (meet == null) { return NotFound("Встречи с указаным идентификатором не найдено."); }
 
-            return Ok(MeetMapper.MapToPublicDto(meet));
-        }
-        catch (Exception ex)
+        if (_userContextService.IsAuthenticated && meet.OwnerId == _userContextService.UserId)
         {
-            _logger.LogError(ex, "Ошибка получения встречи по ее индетификатору");
-            return StatusCode(500, "Internal server error");
+            return Ok(MeetMapper.MapToDto(meet));
         }
+
+        return Ok(MeetMapper.MapToPublicDto(meet));
     }
 
     /// <summary>
@@ -155,42 +141,21 @@ public class MeetsController : ControllerBase
             }
         }
 
-        Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction = null;
-        if (_context.Database.IsRelational())
-        {
-            transaction = await _context.Database.BeginTransactionAsync();
-        }
+        using var transaction = _context.Database.IsRelational()
+            ? await _context.Database.BeginTransactionAsync()
+            : null;
 
-        try
+        var meet = await _meetRepository.CreateMeetAsync(createMeetDto);
+        await _memberRepository.CreateMemberWithMeet(createMeetDto, meet);
+        if (transaction != null)
         {
-            var meet = await _meetRepository.CreateMeetAsync(createMeetDto);
-            await _memberRepository.CreateMemberWithMeet(createMeetDto, meet);
-            if (transaction != null)
-            {
-                await transaction.CommitAsync();
-            }
-            var createdMeet = await _meetRepository.GetMeetByUidAsync(meet.Uid);
+            await transaction.CommitAsync();
+        }
+        var createdMeet = await _meetRepository.GetMeetByUidAsync(meet.Uid);
 
-            return CreatedAtAction(nameof(GetMeet), 
-                new { uid = createdMeet.Uid },
-                MeetMapper.MapToDto(createdMeet));
-        }
-        catch (Exception ex)
-        {
-            if (transaction != null)
-            {
-                await transaction.RollbackAsync();
-            }
-            _logger.LogError(ex, "Ошибка при создании встречи");
-            return StatusCode(500, "Internal server error");
-        }
-        finally
-        {
-            if (transaction != null)
-            {
-                await transaction.DisposeAsync();
-            }
-        }
+        return CreatedAtAction(nameof(GetMeet),
+            new { uid = createdMeet.Uid },
+            MeetMapper.MapToDto(createdMeet));
     }
 
     /// <summary>
@@ -222,14 +187,7 @@ public class MeetsController : ControllerBase
             if (meet == null) { return NotFound("Встречи с указаным идентификатором не найдено."); }
             
             // Проверка владельца встречи
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userIdClaim))
-                return Forbid();
-
-            if (!int.TryParse(userIdClaim, out var userId))
-                return StatusCode(500, "Некорректный токен (userId не int).");
-
-            if (meet.OwnerId != userId)
+            if (meet.OwnerId != _userContextService.UserId)
                 return Forbid();
             
             // Валидация даты - нельзя создавать встречи в прошлом
@@ -253,11 +211,6 @@ public class MeetsController : ControllerBase
             if (!_context.Meets.Any(m => m.Uid == uid)) { return NotFound(); }
             throw;
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Ошибка обновления встречи с указаным идентификатором.");
-            return StatusCode(500, "Internal server error");
-        }
     }
 
     /// <summary>
@@ -276,31 +229,16 @@ public class MeetsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<IEnumerable<ResponseMemberDto>>> GetMeetMembers(Guid uid)
     {
-        try
-        {
-            var meet = await _meetRepository.GetMeetByUidOrNullAsync(uid);
-            if (meet == null)
-                return NotFound("Встреча с указанным идентификатором не найдена.");
-            
-            // Проверка владельца
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userIdClaim))
-                return Forbid();
+        var meet = await _meetRepository.GetMeetByUidOrNullAsync(uid);
+        if (meet == null)
+            return NotFound("Встреча с указанным идентификатором не найдена.");
 
-            if (!int.TryParse(userIdClaim, out var userId))
-                return StatusCode(500, "Некорректный токен (userId не int).");
+        // Проверка владельца
+        if (meet.OwnerId != _userContextService.UserId)
+            return Forbid();
 
-            if (meet.OwnerId != userId)
-                return Forbid();
-            
-            var members = meet.Members.Select(MemberMapper.MapToDto).ToList();
-            return Ok(members);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Ошибка получения участников встречи");
-            return StatusCode(500, "Internal server error");
-        }
+        var members = meet.Members.Select(MemberMapper.MapToDto).ToList();
+        return Ok(members);
     }
 
     /// <summary>
@@ -320,46 +258,31 @@ public class MeetsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> GetAttendanceStats(Guid uid)
     {
-        try
-        {
-            var meet = await _meetRepository.GetMeetByUidOrNullAsync(uid);
-            if (meet == null)
-                return NotFound("Встреча с указанным идентификатором не найдена.");
-            
-            // Проверка владельца
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userIdClaim))
-                return Forbid();
+        var meet = await _meetRepository.GetMeetByUidOrNullAsync(uid);
+        if (meet == null)
+            return NotFound("Встреча с указанным идентификатором не найдена.");
 
-            if (!int.TryParse(userIdClaim, out var userId))
-                return StatusCode(500, "Некорректный токен (userId не int).");
+        // Проверка владельца
+        if (meet.OwnerId != _userContextService.UserId)
+            return Forbid();
 
-            if (meet.OwnerId != userId)
-                return Forbid();
-            
-            var checkedInMembers = meet.Members
-                .Where(m => m.IsCheckedIn)
-                .OrderBy(m => m.CheckedInAt)
-                .Select(m => new
-                {
-                    name = m.Name,
-                    checkedInAt = m.CheckedInAt!.Value
-                })
-                .ToList();
-            
-            return Ok(new
+        var checkedInMembers = meet.Members
+            .Where(m => m.IsCheckedIn)
+            .OrderBy(m => m.CheckedInAt)
+            .Select(m => new
             {
-                meetTitle = meet.Title,
-                meetDate = meet.Date,
-                totalCheckedIn = checkedInMembers.Count,
-                members = checkedInMembers
-            });
-        }
-        catch (Exception ex)
+                name = m.Name,
+                checkedInAt = m.CheckedInAt!.Value
+            })
+            .ToList();
+
+        return Ok(new
         {
-            _logger.LogError(ex, "Ошибка получения статистики посещаемости");
-            return StatusCode(500, "Internal server error");
-        }
+            meetTitle = meet.Title,
+            meetDate = meet.Date,
+            totalCheckedIn = checkedInMembers.Count,
+            members = checkedInMembers
+        });
     }
     
     /// <summary>
@@ -379,59 +302,44 @@ public class MeetsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> ExportAttendanceStats(Guid uid)
     {
-        try
+        var meet = await _meetRepository.GetMeetByUidOrNullAsync(uid);
+        if (meet == null)
+            return NotFound("Встреча с указанным идентификатором не найдена.");
+
+        // Проверка владельца
+        if (meet.OwnerId != _userContextService.UserId)
+            return Forbid();
+
+        var checkedInMembers = meet.Members
+            .Where(m => m.IsCheckedIn)
+            .OrderBy(m => m.CheckedInAt)
+            .ToList();
+
+        // Формируем CSV
+        var csvLines = new List<string>
         {
-            var meet = await _meetRepository.GetMeetByUidOrNullAsync(uid);
-            if (meet == null)
-                return NotFound("Встреча с указанным идентификатором не найдена.");
-            
-            // Проверка владельца
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userIdClaim))
-                return Forbid();
+            "Имя,Дата и время сканирования"
+        };
 
-            if (!int.TryParse(userIdClaim, out var userId))
-                return StatusCode(500, "Некорректный токен (userId не int).");
-
-            if (meet.OwnerId != userId)
-                return Forbid();
-            
-            var checkedInMembers = meet.Members
-                .Where(m => m.IsCheckedIn)
-                .OrderBy(m => m.CheckedInAt)
-                .ToList();
-            
-            // Формируем CSV
-            var csvLines = new List<string>
+        foreach (var member in checkedInMembers)
+        {
+            var name = member.Name ?? string.Empty;
+            name = name.Replace("\"", "\"\"");
+            if (name.Length > 0 && (name[0] == '=' || name[0] == '+' || name[0] == '-' || name[0] == '@' || name[0] == '\t' || name[0] == '\r'))
             {
-                "Имя,Дата и время сканирования"
-            };
-            
-            foreach (var member in checkedInMembers)
-            {
-                var name = member.Name ?? string.Empty;
-                name = name.Replace("\"", "\"\"");
-                if (name.Length > 0 && (name[0] == '=' || name[0] == '+' || name[0] == '-' || name[0] == '@' || name[0] == '\t' || name[0] == '\r'))
-                {
-                    name = "'" + name;
-                }
-
-                var dateStr = member.CheckedInAt!.Value.ToString("yyyy-MM-dd HH:mm:ss");
-                csvLines.Add($"\"{name}\",\"{dateStr}\"");
+                name = "'" + name;
             }
-            
-            var csvContent = string.Join("\n", csvLines);
-            var bytes = System.Text.Encoding.UTF8.GetBytes(csvContent);
-            
-            var fileName = $"attendance_{meet.Title.Replace(" ", "_")}_{DateTime.UtcNow:yyyyMMdd}.csv";
-            
-            return File(bytes, "text/csv", fileName);
+
+            var dateStr = member.CheckedInAt!.Value.ToString("yyyy-MM-dd HH:mm:ss");
+            csvLines.Add($"\"{name}\",\"{dateStr}\"");
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Ошибка выгрузки статистики посещаемости");
-            return StatusCode(500, "Internal server error");
-        }
+
+        var csvContent = string.Join("\n", csvLines);
+        var bytes = System.Text.Encoding.UTF8.GetBytes(csvContent);
+
+        var fileName = $"attendance_{meet.Title.Replace(" ", "_")}_{DateTime.UtcNow:yyyyMMdd}.csv";
+
+        return File(bytes, "text/csv", fileName);
     }
 
     /// <summary>
@@ -454,33 +362,17 @@ public class MeetsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> DeleteMeet(Guid uid)
     {
-        try
-        {
-            var meet = await _context.Meets.FindAsync(uid);
-            if (meet == null)
-                return NotFound();
+        var meet = await _context.Meets.FindAsync(uid);
+        if (meet == null)
+            return NotFound();
 
-            // Берём ID текущего пользователя из токена
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userIdClaim))
-                return Forbid();
+        // Сравниваем владельца
+        if (meet.OwnerId != _userContextService.UserId)
+            return Forbid();
 
-            if (!int.TryParse(userIdClaim, out var userId))
-                return StatusCode(500, "Некорректный токен (userId не int).");
+        _context.Meets.Remove(meet);
+        await _context.SaveChangesAsync();
 
-            // Сравниваем владельца
-            if (meet.OwnerId != userId)
-                return Forbid();
-
-            _context.Meets.Remove(meet);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Ошибка при удалении встречи.");
-            return StatusCode(500, "Internal server error");
-        }
+        return NoContent();
     }
 }

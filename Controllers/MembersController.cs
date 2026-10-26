@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using ease_intro_api.Data.Repository;
 using ease_intro_api.Core.Services;
+using ease_intro_api.Core.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using ease_intro_api.Data;
@@ -21,6 +22,7 @@ public class MembersController : ControllerBase
     private readonly MemberRepository _memberRepository;
     private readonly MemberService _memberService;
     private readonly MeetRepository _meetRepository;
+    private readonly IUserContextService _userContextService;
 
     private readonly string _baseUrl;
 
@@ -31,7 +33,8 @@ public class MembersController : ControllerBase
         MemberRepository memberRepository,
         MemberService memberService,
         MeetRepository meetRepository,
-        IConfiguration configuration
+        IConfiguration configuration,
+        IUserContextService userContextService
     )
     {
         _context = context;
@@ -39,6 +42,7 @@ public class MembersController : ControllerBase
         _memberRepository = memberRepository;
         _memberService = memberService;
         _meetRepository = meetRepository;
+        _userContextService = userContextService;
         
         _baseUrl = configuration["BaseUrl"]?.TrimEnd('/') ?? "https://your-domain.com";
     }
@@ -88,71 +92,52 @@ public class MembersController : ControllerBase
     {
         try
         {
-            Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction = null;
-            if (_context.Database.IsRelational())
+            using var transaction = _context.Database.IsRelational() ? await _context.Database.BeginTransactionAsync() : null;
+
+            if (await _memberRepository.CheckExistsContactAsync(dto.Contact, dto.MeetUid))
             {
-                transaction = await _context.Database.BeginTransactionAsync();
+                return Conflict("Контакт с такой почтой уже зарегистрирован.");
             }
 
-            try
+            var meet = await _meetRepository.PublicGetMeetByUidOrNullAsync(dto.MeetUid);
+            if (meet == null)
             {
-                if (await _memberRepository.CheckExistsContactAsync(dto.Contact, dto.MeetUid))
-                {
-                    return Conflict("Контакт с такой почтой уже зарегистрирован.");
-                }
-
-                var meet = await _meetRepository.PublicGetMeetByUidOrNullAsync(dto.MeetUid);
-                if (meet == null)
-                {
-                    return NotFound("Встречи с указаным идентификатором не найдено.");
-                }
-
-                if (meet.StatusId != 1 && meet.StatusId != 5)
-                {
-                    return BadRequest("Регистрация на данную встречу недоступна.");
-                }
-
-                var meetDateUtc = meet.Date.Kind == DateTimeKind.Utc ? meet.Date : DateTime.SpecifyKind(meet.Date, DateTimeKind.Utc);
-                if (meetDateUtc < DateTime.UtcNow)
-                {
-                    return BadRequest("Срок регистрации на встречу истек.");
-                }
-
-                if (!meet.AllowedPlusOne && !string.IsNullOrWhiteSpace(dto.Companion))
-                {
-                    return BadRequest("На данную встречу нельзя регистрироваться со спутником (+1).");
-                }
-
-                if (meet.LimitMembers > 0 && meet.Members.Count >= meet.LimitMembers)
-                {
-                    return BadRequest("Достигнут лимит участников встречи.");
-                }
-
-                var member = await _memberRepository.CreateMember(dto);
-
-                if (transaction != null)
-                {
-                    await transaction.CommitAsync();
-                }
-
-                return Ok($"Это ваш уникальный идентификатор: {member.QrCode}");
+                return NotFound("Встречи с указаным идентификатором не найдено.");
             }
-            finally
+
+            if (meet.StatusId != 1 && meet.StatusId != 5)
             {
-                if (transaction != null)
-                {
-                    await transaction.DisposeAsync();
-                }
+                return BadRequest("Регистрация на данную встречу недоступна.");
             }
+
+            var meetDateUtc = meet.Date.Kind == DateTimeKind.Utc ? meet.Date : DateTime.SpecifyKind(meet.Date, DateTimeKind.Utc);
+            if (meetDateUtc < DateTime.UtcNow)
+            {
+                return BadRequest("Срок регистрации на встречу истек.");
+            }
+
+            if (!meet.AllowedPlusOne && !string.IsNullOrWhiteSpace(dto.Companion))
+            {
+                return BadRequest("На данную встречу нельзя регистрироваться со спутником (+1).");
+            }
+
+            if (meet.LimitMembers > 0 && meet.Members.Count >= meet.LimitMembers)
+            {
+                return BadRequest("Достигнут лимит участников встречи.");
+            }
+
+            var member = await _memberRepository.CreateMember(dto);
+
+            if (transaction != null)
+            {
+                await transaction.CommitAsync();
+            }
+
+            return Ok($"Это ваш уникальный идентификатор: {member.QrCode}");
         }
         catch (DbUpdateException)
         {
             return Conflict("Контакт с такой почтой уже зарегистрирован.");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Ошибка регистрации на встречу.");
-            return StatusCode(500, "Internal server error");
         }
     }
     
@@ -178,18 +163,10 @@ public class MembersController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails),StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<ResponseMemberDto>> GetMember(int id)
     {
-        try
-        {
-            var member = await _memberService.ShowMemberByIdOrNullAsync(id);
-            if (member == null) { return NotFound("Не найден участник с данным идентификатором в ваших встречах."); }
-            
-            return Ok(MemberMapper.MapToDto(member));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Нет участника с укзаным идентификатором.");
-            return StatusCode(500, "Internal server error");
-        }
+        var member = await _memberService.ShowMemberByIdOrNullAsync(id);
+        if (member == null) { return NotFound("Не найден участник с данным идентификатором в ваших встречах."); }
+
+        return Ok(MemberMapper.MapToDto(member));
     }
     
     /// <summary>
@@ -220,43 +197,28 @@ public class MembersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> UpdateMember(int id, [FromBody] UpdateMemberDto dto)
     {
-        try
+        var member = await _memberService.ShowMemberByIdOrNullAsync(id);
+        if (member == null) { return NotFound("Не найден участник с данным идентификатором в ваших встречах."); }
+
+        // Дополнительная проверка владельца (ShowMemberByIdOrNullAsync уже проверяет, но для безопасности оставляем)
+        var meet = await _meetRepository.PublicGetMeetByUidOrNullAsync(member.MeetGuid);
+        if (meet == null)
+            return NotFound("Встреча не найдена.");
+
+        if (meet.OwnerId != _userContextService.UserId)
+            return Forbid();
+
+        if (!string.IsNullOrWhiteSpace(dto.Contact) && !string.Equals(dto.Contact, member.Contact, StringComparison.OrdinalIgnoreCase))
         {
-            var member = await _memberService.ShowMemberByIdOrNullAsync(id);
-            if (member == null) { return NotFound("Не найден участник с данным идентификатором в ваших встречах."); }
-            
-            // Дополнительная проверка владельца (ShowMemberByIdOrNullAsync уже проверяет, но для безопасности оставляем)
-            var meet = await _meetRepository.PublicGetMeetByUidOrNullAsync(member.MeetGuid);
-            if (meet == null)
-                return NotFound("Встреча не найдена.");
-            
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userIdClaim))
-                return Forbid();
-
-            if (!int.TryParse(userIdClaim, out var userId))
-                return StatusCode(500, "Некорректный токен (userId не int).");
-
-            if (meet.OwnerId != userId)
-                return Forbid();
-
-            if (!string.IsNullOrWhiteSpace(dto.Contact) && !string.Equals(dto.Contact, member.Contact, StringComparison.OrdinalIgnoreCase))
+            if (await _memberRepository.CheckExistsContactAsync(dto.Contact, member.MeetGuid))
             {
-                if (await _memberRepository.CheckExistsContactAsync(dto.Contact, member.MeetGuid))
-                {
-                    return Conflict("Контакт с такой почтой уже зарегистрирован.");
-                }
+                return Conflict("Контакт с такой почтой уже зарегистрирован.");
             }
-            
-            await _memberRepository.UpdateMemberAsync(dto, member);
-            
-            return NoContent();
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Ошибка обновления данных для участника с указаным идентификатором.");
-            return StatusCode(500, "Internal server error");
-        }
+
+        await _memberRepository.UpdateMemberAsync(dto, member);
+
+        return NoContent();
     }
     
     /// <summary>
@@ -276,37 +238,22 @@ public class MembersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> DeleteMember(int id)
     {
-        try
-        {
-            var member = await _memberRepository.GetMemberByIdOrNullAsync(id);
-            if (member == null)
-                return NotFound("Участник с указанным идентификатором не найден.");
-            
-            // Проверка владельца встречи
-            var meet = await _meetRepository.PublicGetMeetByUidOrNullAsync(member.MeetGuid);
-            if (meet == null)
-                return NotFound("Встреча не найдена.");
-            
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userIdClaim))
-                return Forbid();
+        var member = await _memberRepository.GetMemberByIdOrNullAsync(id);
+        if (member == null)
+            return NotFound("Участник с указанным идентификатором не найден.");
 
-            if (!int.TryParse(userIdClaim, out var userId))
-                return StatusCode(500, "Некорректный токен (userId не int).");
+        // Проверка владельца встречи
+        var meet = await _meetRepository.PublicGetMeetByUidOrNullAsync(member.MeetGuid);
+        if (meet == null)
+            return NotFound("Встреча не найдена.");
 
-            if (meet.OwnerId != userId)
-                return Forbid();
-            
-            _context.Member.Remove(member);
-            await _context.SaveChangesAsync();
-            
-            return NoContent();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Ошибка удаления участника встречи с указаным идентификатором.");
-            return StatusCode(500, "Internal server error");
-        }
+        if (meet.OwnerId != _userContextService.UserId)
+            return Forbid();
+
+        _context.Member.Remove(member);
+        await _context.SaveChangesAsync();
+
+        return NoContent();
     }
     
     /// <summary>
@@ -332,32 +279,19 @@ public class MembersController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetMemberMeets(string contact)
     {
-        try
+        var currentUserEmail = _userContextService.User.FindFirst(ClaimTypes.Name)?.Value;
+        var userId = _userContextService.UserId;
+
+        var members = await _memberRepository.GetMemberByContactAsync(contact);
+
+        if (!string.Equals(contact, currentUserEmail, StringComparison.OrdinalIgnoreCase))
         {
-            var currentUserEmail = User.FindFirst(ClaimTypes.Name)?.Value;
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-            if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var userId))
-            {
-                return Unauthorized();
-            }
-
-            var members = await _memberRepository.GetMemberByContactAsync(contact);
-
-            if (!string.Equals(contact, currentUserEmail, StringComparison.OrdinalIgnoreCase))
-            {
-                members = members.Where(m => m.Meet != null && m.Meet.OwnerId == userId).ToList();
-            }
-
-            var membersDto = members.Select(MemberMapper.MapToDto).ToList();
-        
-            return Ok(membersDto);
+            members = members.Where(m => m.Meet != null && m.Meet.OwnerId == userId).ToList();
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Ошибка в процессе получения участников встречи по указанному контакту.");
-            return StatusCode(500, "Internal server error");
-        }
+
+        var membersDto = members.Select(MemberMapper.MapToDto).ToList();
+
+        return Ok(membersDto);
     }
     
     /// <summary>
@@ -377,89 +311,19 @@ public class MembersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> ScanMemberQr(string qrcode)
     {
-        try
+        var member = await _memberRepository.GetMemberByQrCodeOrNullAsync(qrcode);
+        if (member == null)
+            return NotFound("QR-код не найден.");
+
+        var meet = await _meetRepository.PublicGetMeetByUidOrNullAsync(member.MeetGuid);
+        if (meet == null)
+            return NotFound("Встреча не найдена.");
+
+        var now = DateTime.UtcNow;
+        var meetDate = meet.Date.ToUniversalTime();
+
+        if (member.IsCheckedIn)
         {
-            var member = await _memberRepository.GetMemberByQrCodeOrNullAsync(qrcode);
-            if (member == null)
-                return NotFound("QR-код не найден.");
-            
-            var meet = await _meetRepository.PublicGetMeetByUidOrNullAsync(member.MeetGuid);
-            if (meet == null)
-                return NotFound("Встреча не найдена.");
-            
-            var now = DateTime.UtcNow;
-            var meetDate = meet.Date.ToUniversalTime();
-            
-            if (member.IsCheckedIn)
-            {
-                return Ok(new
-                {
-                    member = new
-                    {
-                        name = member.Name,
-                        companion = member.Companion,
-                        contact = MaskEmail(member.Contact),
-                        role = member.Role.ToString()
-                    },
-                    meetInfo = new
-                    {
-                        title = meet.Title,
-                        date = meet.Date,
-                        location = meet.Location
-                    },
-                    qrValid = false,
-                    message = "QR-код уже использован. Участник был отмечен ранее.",
-                    checkedInAt = member.CheckedInAt,
-                    isCheckedIn = true
-                });
-            }
-
-            bool canCheckIn = false;
-            string message;
-
-            bool hasTime = meetDate.TimeOfDay != TimeSpan.Zero;
-
-            if (hasTime)
-            {
-                var threeHoursBefore = meetDate.AddHours(-3);
-                var meetDayEnd = new DateTime(meetDate.Year, meetDate.Month, meetDate.Day, 23, 59, 59, DateTimeKind.Utc);
-
-                canCheckIn = now >= threeHoursBefore && now <= meetDayEnd;
-
-                if (now < threeHoursBefore)
-                {
-                    message = $"Сканирование возможно не ранее {threeHoursBefore:dd.MM.yyyy HH:mm} (за 3 часа до начала мероприятия)";
-                }
-                else if (now > meetDayEnd)
-                {
-                    message = "Время сканирования истекло";
-                }
-                else
-                {
-                    message = "QR-код действителен";
-                }
-            }
-            else
-            {
-                var meetDayStart = new DateTime(meetDate.Year, meetDate.Month, meetDate.Day, 0, 0, 0, DateTimeKind.Utc);
-                var meetDayEnd = meetDayStart.AddDays(1).AddSeconds(-1);
-
-                canCheckIn = now >= meetDayStart && now <= meetDayEnd;
-
-                if (now < meetDayStart)
-                {
-                    message = $"Сканирование возможно только {meetDayStart:dd.MM.yyyy} (в день мероприятия)";
-                }
-                else if (now > meetDayEnd)
-                {
-                    message = "Время сканирования истекло";
-                }
-                else
-                {
-                    message = "QR-код действителен";
-                }
-            }
-
             return Ok(new
             {
                 member = new
@@ -475,17 +339,79 @@ public class MembersController : ControllerBase
                     date = meet.Date,
                     location = meet.Location
                 },
-                qrValid = canCheckIn,
-                message = message,
-                checkedInAt = (DateTime?)null,
-                isCheckedIn = false
+                qrValid = false,
+                message = "QR-код уже использован. Участник был отмечен ранее.",
+                checkedInAt = member.CheckedInAt,
+                isCheckedIn = true
             });
         }
-        catch (Exception ex)
+
+        bool canCheckIn = false;
+        string message;
+
+        bool hasTime = meetDate.TimeOfDay != TimeSpan.Zero;
+
+        if (hasTime)
         {
-            _logger.LogError(ex, "Ошибка при предпросмотре QR-кода участника.");
-            return StatusCode(500, "Internal server error");
+            var threeHoursBefore = meetDate.AddHours(-3);
+            var meetDayEnd = new DateTime(meetDate.Year, meetDate.Month, meetDate.Day, 23, 59, 59, DateTimeKind.Utc);
+
+            canCheckIn = now >= threeHoursBefore && now <= meetDayEnd;
+
+            if (now < threeHoursBefore)
+            {
+                message = $"Сканирование возможно не ранее {threeHoursBefore:dd.MM.yyyy HH:mm} (за 3 часа до начала мероприятия)";
+            }
+            else if (now > meetDayEnd)
+            {
+                message = "Время сканирования истекло";
+            }
+            else
+            {
+                message = "QR-код действителен";
+            }
         }
+        else
+        {
+            var meetDayStart = new DateTime(meetDate.Year, meetDate.Month, meetDate.Day, 0, 0, 0, DateTimeKind.Utc);
+            var meetDayEnd = meetDayStart.AddDays(1).AddSeconds(-1);
+
+            canCheckIn = now >= meetDayStart && now <= meetDayEnd;
+
+            if (now < meetDayStart)
+            {
+                message = $"Сканирование возможно только {meetDayStart:dd.MM.yyyy} (в день мероприятия)";
+            }
+            else if (now > meetDayEnd)
+            {
+                message = "Время сканирования истекло";
+            }
+            else
+            {
+                message = "QR-код действителен";
+            }
+        }
+
+        return Ok(new
+        {
+            member = new
+            {
+                name = member.Name,
+                companion = member.Companion,
+                contact = MaskEmail(member.Contact),
+                role = member.Role.ToString()
+            },
+            meetInfo = new
+            {
+                title = meet.Title,
+                date = meet.Date,
+                location = meet.Location
+            },
+            qrValid = canCheckIn,
+            message = message,
+            checkedInAt = (DateTime?)null,
+            isCheckedIn = false
+        });
     }
 
     /// <summary>
@@ -507,107 +433,27 @@ public class MembersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> CheckInMemberQr(string qrcode)
     {
-        try
+        var member = await _memberRepository.GetMemberByQrCodeOrNullAsync(qrcode);
+        if (member == null)
+            return NotFound("QR-код не найден.");
+
+        var meet = await _meetRepository.PublicGetMeetByUidOrNullAsync(member.MeetGuid);
+        if (meet == null)
+            return NotFound("Встреча не найдена.");
+
+        // Проверка прав (владелец встречи)
+        if (meet.OwnerId != _userContextService.UserId)
         {
-            var member = await _memberRepository.GetMemberByQrCodeOrNullAsync(qrcode);
-            if (member == null)
-                return NotFound("QR-код не найден.");
+            return Forbid();
+        }
 
-            var meet = await _meetRepository.PublicGetMeetByUidOrNullAsync(member.MeetGuid);
-            if (meet == null)
-                return NotFound("Встреча не найдена.");
-
-            // Проверка прав (владелец встречи)
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var userId) || meet.OwnerId != userId)
-            {
-                return Forbid();
-            }
-
-            if (member.IsCheckedIn)
-            {
-                return Ok(new
-                {
-                    member = new
-                    {
-                        name = member.Name,
-                        companion = member.Companion,
-                        contact = MaskEmail(member.Contact),
-                        role = member.Role.ToString()
-                    },
-                    meetInfo = new
-                    {
-                        title = meet.Title,
-                        date = meet.Date,
-                        location = meet.Location
-                    },
-                    qrValid = false,
-                    message = "QR-код уже использован. Участник был отмечен ранее.",
-                    checkedInAt = member.CheckedInAt,
-                    isCheckedIn = true
-                });
-            }
-            
-            var now = DateTime.UtcNow;
-            var meetDate = meet.Date.ToUniversalTime();
-
-            bool canCheckIn = false;
-            string message;
-            
-            bool hasTime = meetDate.TimeOfDay != TimeSpan.Zero;
-            
-            if (hasTime)
-            {
-                var threeHoursBefore = meetDate.AddHours(-3);
-                var meetDayEnd = new DateTime(meetDate.Year, meetDate.Month, meetDate.Day, 23, 59, 59, DateTimeKind.Utc);
-                
-                canCheckIn = now >= threeHoursBefore && now <= meetDayEnd;
-                
-                if (now < threeHoursBefore)
-                {
-                    message = $"Сканирование возможно не ранее {threeHoursBefore:dd.MM.yyyy HH:mm} (за 3 часа до начала мероприятия)";
-                }
-                else if (now > meetDayEnd)
-                {
-                    message = "Время сканирования истекло";
-                }
-                else
-                {
-                    message = "Участник успешно отмечен";
-                }
-            }
-            else
-            {
-                var meetDayStart = new DateTime(meetDate.Year, meetDate.Month, meetDate.Day, 0, 0, 0, DateTimeKind.Utc);
-                var meetDayEnd = meetDayStart.AddDays(1).AddSeconds(-1);
-                
-                canCheckIn = now >= meetDayStart && now <= meetDayEnd;
-                
-                if (now < meetDayStart)
-                {
-                    message = $"Сканирование возможно только {meetDayStart:dd.MM.yyyy} (в день мероприятия)";
-                }
-                else if (now > meetDayEnd)
-                {
-                    message = "Время сканирования истекло";
-                }
-                else
-                {
-                    message = "Участник успешно отмечен";
-                }
-            }
-            
-            if (canCheckIn)
-            {
-                await _memberRepository.CheckInMemberAsync(member);
-                member = await _memberRepository.GetMemberByQrCodeOrNullAsync(qrcode);
-            }
-            
+        if (member.IsCheckedIn)
+        {
             return Ok(new
             {
                 member = new
                 {
-                    name = member!.Name,
+                    name = member.Name,
                     companion = member.Companion,
                     contact = MaskEmail(member.Contact),
                     role = member.Role.ToString()
@@ -618,17 +464,88 @@ public class MembersController : ControllerBase
                     date = meet.Date,
                     location = meet.Location
                 },
-                qrValid = !canCheckIn && !member.IsCheckedIn,
-                message = message,
-                checkedInAt = member.IsCheckedIn ? member.CheckedInAt : null,
-                isCheckedIn = member.IsCheckedIn
+                qrValid = false,
+                message = "QR-код уже использован. Участник был отмечен ранее.",
+                checkedInAt = member.CheckedInAt,
+                isCheckedIn = true
             });
         }
-        catch (Exception ex)
+
+        var now = DateTime.UtcNow;
+        var meetDate = meet.Date.ToUniversalTime();
+
+        bool canCheckIn = false;
+        string message;
+
+        bool hasTime = meetDate.TimeOfDay != TimeSpan.Zero;
+
+        if (hasTime)
         {
-            _logger.LogError(ex, "Ошибка при отметке прихода участника по QR-коду.");
-            return StatusCode(500, "Internal server error");
+            var threeHoursBefore = meetDate.AddHours(-3);
+            var meetDayEnd = new DateTime(meetDate.Year, meetDate.Month, meetDate.Day, 23, 59, 59, DateTimeKind.Utc);
+
+            canCheckIn = now >= threeHoursBefore && now <= meetDayEnd;
+
+            if (now < threeHoursBefore)
+            {
+                message = $"Сканирование возможно не ранее {threeHoursBefore:dd.MM.yyyy HH:mm} (за 3 часа до начала мероприятия)";
+            }
+            else if (now > meetDayEnd)
+            {
+                message = "Время сканирования истекло";
+            }
+            else
+            {
+                message = "Участник успешно отмечен";
+            }
         }
+        else
+        {
+            var meetDayStart = new DateTime(meetDate.Year, meetDate.Month, meetDate.Day, 0, 0, 0, DateTimeKind.Utc);
+            var meetDayEnd = meetDayStart.AddDays(1).AddSeconds(-1);
+
+            canCheckIn = now >= meetDayStart && now <= meetDayEnd;
+
+            if (now < meetDayStart)
+            {
+                message = $"Сканирование возможно только {meetDayStart:dd.MM.yyyy} (в день мероприятия)";
+            }
+            else if (now > meetDayEnd)
+            {
+                message = "Время сканирования истекло";
+            }
+            else
+            {
+                message = "Участник успешно отмечен";
+            }
+        }
+
+        if (canCheckIn)
+        {
+            await _memberRepository.CheckInMemberAsync(member);
+            member = await _memberRepository.GetMemberByQrCodeOrNullAsync(qrcode);
+        }
+
+        return Ok(new
+        {
+            member = new
+            {
+                name = member!.Name,
+                companion = member.Companion,
+                contact = MaskEmail(member.Contact),
+                role = member.Role.ToString()
+            },
+            meetInfo = new
+            {
+                title = meet.Title,
+                date = meet.Date,
+                location = meet.Location
+            },
+            qrValid = !canCheckIn && !member.IsCheckedIn,
+            message = message,
+            checkedInAt = member.IsCheckedIn ? member.CheckedInAt : null,
+            isCheckedIn = member.IsCheckedIn
+        });
     }
     
     /// <summary>
@@ -648,22 +565,14 @@ public class MembersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetQrImage(string qrcode)
     {
-        try
+        var member = await _memberRepository.GetMemberByQrCodeOrNullAsync(qrcode);
+        if (member == null)
         {
-            var member = await _memberRepository.GetMemberByQrCodeOrNullAsync(qrcode);
-            if (member == null)
-            {
-                return NotFound("QR-код не найден.");
-            }
+            return NotFound("QR-код не найден.");
+        }
 
-            byte[] pngBytes = ProcessingQrService.GenerateQrPng($"{_baseUrl}/api/members/qrcode/{qrcode}");
-            return File(pngBytes, "image/png");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Ошибка при генерации QR-кода.");
-            return StatusCode(500, "Internal server error");
-        }
+        byte[] pngBytes = ProcessingQrService.GenerateQrPng($"{_baseUrl}/api/members/qrcode/{qrcode}");
+        return File(pngBytes, "image/png");
     }
     
     /// <summary>
@@ -683,22 +592,14 @@ public class MembersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DownloadQrImage(string qrcode)
     {
-        try
+        var member = await _memberRepository.GetMemberByQrCodeOrNullAsync(qrcode);
+        if (member == null)
         {
-            var member = await _memberRepository.GetMemberByQrCodeOrNullAsync(qrcode);
-            if (member == null)
-            {
-                return NotFound("QR-код не найден.");
-            }
+            return NotFound("QR-код не найден.");
+        }
 
-            byte[] pngBytes = ProcessingQrService.GenerateQrPng($"{_baseUrl}/api/members/qrcode/{qrcode}");
-            return File(pngBytes, "image/png", $"qr_{qrcode}.png");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Ошибка при скачивании QR-кода.");
-            return StatusCode(500, "Internal server error");
-        }
+        byte[] pngBytes = ProcessingQrService.GenerateQrPng($"{_baseUrl}/api/members/qrcode/{qrcode}");
+        return File(pngBytes, "image/png", $"qr_{qrcode}.png");
     }
     
 }

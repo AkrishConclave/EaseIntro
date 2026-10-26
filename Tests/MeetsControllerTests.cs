@@ -35,6 +35,7 @@ public class MeetsControllerTests
     {
         var mock = new Mock<IUserContextService>();
         mock.Setup(x => x.UserId).Returns(userId);
+        mock.Setup(x => x.IsAuthenticated).Returns(true);
         return mock;
     }
 
@@ -59,7 +60,7 @@ public class MeetsControllerTests
         var meetService = new MeetService(meetRepo, userContextMock.Object);
         var loggerMock = new Mock<ILogger<MeetsController>>();
 
-        var controller = new MeetsController(context, loggerMock.Object, meetService, meetRepo, memberRepo);
+        var controller = new MeetsController(context, loggerMock.Object, meetService, meetRepo, memberRepo, userContextMock.Object);
 
         var dto = new CreateMeetDto
         {
@@ -96,7 +97,7 @@ public class MeetsControllerTests
         var meetService = new MeetService(meetRepo, userContextMock.Object);
         var loggerMock = new Mock<ILogger<MeetsController>>();
 
-        var controller = new MeetsController(context, loggerMock.Object, meetService, meetRepo, memberRepo);
+        var controller = new MeetsController(context, loggerMock.Object, meetService, meetRepo, memberRepo, userContextMock.Object);
 
         var dto = new CreateMeetDto
         {
@@ -135,7 +136,7 @@ public class MeetsControllerTests
         var meetService = new MeetService(meetRepo, userContextMock.Object);
         var loggerMock = new Mock<ILogger<MeetsController>>();
 
-        var controller = new MeetsController(context, loggerMock.Object, meetService, meetRepo, memberRepo);
+        var controller = new MeetsController(context, loggerMock.Object, meetService, meetRepo, memberRepo, userContextMock.Object);
 
         var dto = new CreateMeetDto
         {
@@ -215,18 +216,7 @@ public class MeetsControllerTests
         var meetService = new MeetService(meetRepo, userContextMock.Object);
         var loggerMock = new Mock<ILogger<MeetsController>>();
 
-        var controller = new MeetsController(context, loggerMock.Object, meetService, meetRepo, memberRepo);
-        controller.ControllerContext = new ControllerContext
-        {
-            HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(new ClaimsIdentity(new[]
-                {
-                    new Claim(ClaimTypes.NameIdentifier, "1"),
-                    new Claim(ClaimTypes.Role, "User")
-                }, "TestAuth"))
-            }
-        };
+        var controller = new MeetsController(context, loggerMock.Object, meetService, meetRepo, memberRepo, userContextMock.Object);
 
         var updateDto = new UpdateMeetDto
         {
