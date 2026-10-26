@@ -29,5 +29,5 @@ public class User
     [MaxLength(60)]
     public string Role { get; set; } = "User";
     
-    public virtual ICollection<User> Users { get; set; } = new List<User>();
+    public virtual ICollection<Meet> Meets { get; set; } = new List<Meet>();
 }

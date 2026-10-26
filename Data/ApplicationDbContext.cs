@@ -31,5 +31,9 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<Member>()
             .HasIndex(u => new { u.MeetGuid, u.Contact })
             .IsUnique();
+
+        modelBuilder.Entity<User>()
+            .HasIndex(u => u.UserEmail)
+            .IsUnique();
     }
 }
