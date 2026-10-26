@@ -1,5 +1,6 @@
 using QRCoder;
 using System.Text;
+using Microsoft.IdentityModel.Tokens;
 
 namespace ease_intro_api.Core.Services;
 
@@ -12,7 +13,7 @@ public class ProcessingQrService
     /// <returns>Строка-идентификатор на основании которой генерируется изображение QR-кода.</returns>
     public static string GenerateQr(Guid meetUid)
     {
-        return Convert.ToBase64String(Encoding.UTF8.GetBytes($"{Guid.NewGuid()}-{meetUid}"));
+        return Base64UrlEncoder.Encode(Encoding.UTF8.GetBytes($"{Guid.NewGuid()}-{meetUid}"));
     }
     
     /// <summary>

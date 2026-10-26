@@ -21,7 +21,7 @@ public class MembersController : ControllerBase
     private readonly MemberService _memberService;
     private readonly MeetRepository _meetRepository;
 
-    private readonly string _url;
+    private readonly string _baseUrl;
 
     public MembersController
     (
@@ -29,7 +29,8 @@ public class MembersController : ControllerBase
         ILogger<MembersController> logger,
         MemberRepository memberRepository,
         MemberService memberService,
-        MeetRepository meetRepository
+        MeetRepository meetRepository,
+        IConfiguration configuration
     )
     {
         _context = context;
@@ -38,7 +39,28 @@ public class MembersController : ControllerBase
         _memberService = memberService;
         _meetRepository = meetRepository;
         
-        _url = "https://ei-api.abdera.tech/api/members/qrcode/";
+        _baseUrl = configuration["BaseUrl"]?.TrimEnd('/') ?? "https://your-domain.com";
+    }
+
+    /// <summary>
+    /// Маскирует email участника для безопасного отображения.
+    /// </summary>
+    private static string MaskEmail(string contact)
+    {
+        if (string.IsNullOrWhiteSpace(contact))
+            return string.Empty;
+
+        var parts = contact.Split('@');
+        if (parts.Length == 2)
+        {
+            var local = parts[0];
+            var domain = parts[1];
+            if (local.Length > 0)
+            {
+                return $"{local[0]}***@{domain}";
+            }
+        }
+        return "***";
     }
     
     /// <summary>
@@ -251,21 +273,15 @@ public class MembersController : ControllerBase
     }
     
     /// <summary>
-    /// Сканировать QR-код участника для отметки посещения.
+    /// Безопасный (идемпотентный) предпросмотр статуса билета по QR-коду.
     /// </summary>
     /// <remarks>
-    /// Публичный endpoint для сканирования QR-кодов обычной камерой. Не требует авторизации.
-    /// При сканировании проверяется время мероприятия:
-    /// - Если указано время: можно сканировать за 3 часа до начала мероприятия
-    /// - Если указана только дата (время = 00:00:00): можно сканировать в день мероприятия
-    /// - Если время неподходящее - QR остается действительным, участник не отмечается
-    /// - Если время подходящее и участник еще не отмечен - автоматически отмечается время прихода, QR становится недействительным
-    /// - Если участник уже отмечен - QR недействителен
+    /// Публичный endpoint для получения информации о билете без его гашения (IsCheckedIn не меняется).
+    /// Маскирует полный контакт участника.
     /// </remarks>
-    /// <param name="qrcode">QR-код участника встречи для сканирования.</param>
+    /// <param name="qrcode">QR-код участника встречи.</param>
     /// <returns>
-    /// Возвращает информацию об участнике и результат сканирования (200 OK).
-    /// Возвращает 404 Not Found, если участник не найден по QR-коду.
+    /// Информация о билете и статус готовности к отметке.
     /// </returns>
     [HttpGet("qrcode/{qrcode}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -286,7 +302,6 @@ public class MembersController : ControllerBase
             var now = DateTime.UtcNow;
             var meetDate = meet.Date.ToUniversalTime();
             
-            // Если участник уже отмечен - QR недействителен
             if (member.IsCheckedIn)
             {
                 return Ok(new
@@ -295,7 +310,141 @@ public class MembersController : ControllerBase
                     {
                         name = member.Name,
                         companion = member.Companion,
-                        contact = member.Contact,
+                        contact = MaskEmail(member.Contact),
+                        role = member.Role.ToString()
+                    },
+                    meetInfo = new
+                    {
+                        title = meet.Title,
+                        date = meet.Date,
+                        location = meet.Location
+                    },
+                    qrValid = false,
+                    message = "QR-код уже использован. Участник был отмечен ранее.",
+                    checkedInAt = member.CheckedInAt,
+                    isCheckedIn = true
+                });
+            }
+
+            bool canCheckIn = false;
+            string message;
+
+            bool hasTime = meetDate.TimeOfDay != TimeSpan.Zero;
+
+            if (hasTime)
+            {
+                var threeHoursBefore = meetDate.AddHours(-3);
+                var meetDayEnd = new DateTime(meetDate.Year, meetDate.Month, meetDate.Day, 23, 59, 59, DateTimeKind.Utc);
+
+                canCheckIn = now >= threeHoursBefore && now <= meetDayEnd;
+
+                if (now < threeHoursBefore)
+                {
+                    message = $"Сканирование возможно не ранее {threeHoursBefore:dd.MM.yyyy HH:mm} (за 3 часа до начала мероприятия)";
+                }
+                else if (now > meetDayEnd)
+                {
+                    message = "Время сканирования истекло";
+                }
+                else
+                {
+                    message = "QR-код действителен";
+                }
+            }
+            else
+            {
+                var meetDayStart = new DateTime(meetDate.Year, meetDate.Month, meetDate.Day, 0, 0, 0, DateTimeKind.Utc);
+                var meetDayEnd = meetDayStart.AddDays(1).AddSeconds(-1);
+
+                canCheckIn = now >= meetDayStart && now <= meetDayEnd;
+
+                if (now < meetDayStart)
+                {
+                    message = $"Сканирование возможно только {meetDayStart:dd.MM.yyyy} (в день мероприятия)";
+                }
+                else if (now > meetDayEnd)
+                {
+                    message = "Время сканирования истекло";
+                }
+                else
+                {
+                    message = "QR-код действителен";
+                }
+            }
+
+            return Ok(new
+            {
+                member = new
+                {
+                    name = member.Name,
+                    companion = member.Companion,
+                    contact = MaskEmail(member.Contact),
+                    role = member.Role.ToString()
+                },
+                meetInfo = new
+                {
+                    title = meet.Title,
+                    date = meet.Date,
+                    location = meet.Location
+                },
+                qrValid = canCheckIn,
+                message = message,
+                checkedInAt = (DateTime?)null,
+                isCheckedIn = false
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка при предпросмотре QR-кода участника.");
+            return StatusCode(500, "Internal server error");
+        }
+    }
+
+    /// <summary>
+    /// Фиксация прохода участника по QR-коду (Check-In).
+    /// </summary>
+    /// <remarks>
+    /// Фиксирует проход участника (IsCheckedIn = true). Доступно владельцу встречи.
+    /// </remarks>
+    /// <param name="qrcode">QR-код участника встречи для отметки прихода.</param>
+    /// <returns>
+    /// Результат фиксации прохода.
+    /// </returns>
+    [HttpPost("qrcode/{qrcode}/check-in")]
+    [Authorize(Roles = "User")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> CheckInMemberQr(string qrcode)
+    {
+        try
+        {
+            var member = await _memberRepository.GetMemberByQrCodeOrNullAsync(qrcode);
+            if (member == null)
+                return NotFound("QR-код не найден.");
+
+            var meet = await _meetRepository.PublicGetMeetByUidOrNullAsync(member.MeetGuid);
+            if (meet == null)
+                return NotFound("Встреча не найдена.");
+
+            // Проверка прав (владелец встречи)
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var userId) || meet.OwnerId != userId)
+            {
+                return Forbid();
+            }
+
+            if (member.IsCheckedIn)
+            {
+                return Ok(new
+                {
+                    member = new
+                    {
+                        name = member.Name,
+                        companion = member.Companion,
+                        contact = MaskEmail(member.Contact),
                         role = member.Role.ToString()
                     },
                     meetInfo = new
@@ -311,18 +460,17 @@ public class MembersController : ControllerBase
                 });
             }
             
-            // Проверяем время мероприятия
+            var now = DateTime.UtcNow;
+            var meetDate = meet.Date.ToUniversalTime();
+
             bool canCheckIn = false;
             string message;
             
-            // Проверяем, указано ли время (если время = 00:00:00, значит указана только дата)
             bool hasTime = meetDate.TimeOfDay != TimeSpan.Zero;
             
             if (hasTime)
             {
-                // Если указано время: можно сканировать за 3 часа до начала
                 var threeHoursBefore = meetDate.AddHours(-3);
-                // Можно сканировать с момента "за 3 часа до начала" и до конца дня мероприятия
                 var meetDayEnd = new DateTime(meetDate.Year, meetDate.Month, meetDate.Day, 23, 59, 59, DateTimeKind.Utc);
                 
                 canCheckIn = now >= threeHoursBefore && now <= meetDayEnd;
@@ -338,12 +486,10 @@ public class MembersController : ControllerBase
                 else
                 {
                     message = "Участник успешно отмечен";
-                    canCheckIn = true;
                 }
             }
             else
             {
-                // Если указана только дата: можно сканировать в день мероприятия
                 var meetDayStart = new DateTime(meetDate.Year, meetDate.Month, meetDate.Day, 0, 0, 0, DateTimeKind.Utc);
                 var meetDayEnd = meetDayStart.AddDays(1).AddSeconds(-1);
                 
@@ -360,15 +506,12 @@ public class MembersController : ControllerBase
                 else
                 {
                     message = "Участник успешно отмечен";
-                    canCheckIn = true;
                 }
             }
             
-            // Если время подходящее - отмечаем участника
             if (canCheckIn)
             {
                 await _memberRepository.CheckInMemberAsync(member);
-                // Обновляем данные из БД
                 member = await _memberRepository.GetMemberByQrCodeOrNullAsync(qrcode);
             }
             
@@ -378,7 +521,7 @@ public class MembersController : ControllerBase
                 {
                     name = member!.Name,
                     companion = member.Companion,
-                    contact = member.Contact,
+                    contact = MaskEmail(member.Contact),
                     role = member.Role.ToString()
                 },
                 meetInfo = new
@@ -395,7 +538,7 @@ public class MembersController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка при сканировании QR-кода участника.");
+            _logger.LogError(ex, "Ошибка при отметке прихода участника по QR-коду.");
             return StatusCode(500, "Internal server error");
         }
     }
@@ -405,23 +548,27 @@ public class MembersController : ControllerBase
     /// </summary>
     /// <remarks>
     /// Этот метод возвращает изображение QR-кода, связанное с участником, по предоставленному QR-коду.
-    /// При первом запросе QR-код должен быть действительным. В дальнейшем его статус становится "недействительным".
-    /// Также, необходимо продумать разделение URL для разных сред (разработка, продакшн).
+    /// Возвращает 404 Not Found, если QR-код не найден в базе данных.
     /// </remarks>
     /// <param name="qrcode">QR-код, привязанный к участнику, получаемый из URL.</param>
     /// <returns>
     /// Изображение QR-кода для предъявления пользователю в формате PNG.
-    /// Возвращается с кодом 200 OK при успешном запросе.
     /// </returns>
     [HttpGet("qrcode/image/{qrcode}")]
     [Produces("image/png")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(FileContentResult),StatusCodes.Status404NotFound)]
-    public IActionResult GetQrImage(string qrcode)
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetQrImage(string qrcode)
     {
         try
         {
-            byte[] pngBytes = ProcessingQrService.GenerateQrPng($"{_url}{qrcode}");
+            var member = await _memberRepository.GetMemberByQrCodeOrNullAsync(qrcode);
+            if (member == null)
+            {
+                return NotFound("QR-код не найден.");
+            }
+
+            byte[] pngBytes = ProcessingQrService.GenerateQrPng($"{_baseUrl}/api/members/qrcode/{qrcode}");
             return File(pngBytes, "image/png");
         }
         catch (Exception ex)
@@ -436,23 +583,28 @@ public class MembersController : ControllerBase
     /// </summary>
     /// <remarks>
     /// Этот метод позволяет пользователю скачать изображение QR-кода, связанное с участником, по предоставленному QR-коду.
-    /// Пользователь может сохранить этот QR-код для предъявления на событии.
+    /// Возвращает 404 Not Found, если QR-код не найден в базе данных.
     /// </remarks>
     /// <param name="qrcode">QR-код, привязанный к участнику, получаемый из URL.</param>
     /// <returns>
     /// Файл с изображением QR-кода в формате PNG для скачивания.
-    /// Возвращается с кодом 200 OK при успешном запросе.
     /// </returns>
     [HttpGet("qrcode/image/{qrcode}/download")]
     [Produces("image/png")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(FileContentResult),StatusCodes.Status404NotFound)]
-    public IActionResult DownloadQrImage(string qrcode)
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DownloadQrImage(string qrcode)
     {
         try
         {
-            byte[] pngBytes = ProcessingQrService.GenerateQrPng($"{_url}{qrcode}");
-            return File(pngBytes, "image/png", "QR код для предъявления.");
+            var member = await _memberRepository.GetMemberByQrCodeOrNullAsync(qrcode);
+            if (member == null)
+            {
+                return NotFound("QR-код не найден.");
+            }
+
+            byte[] pngBytes = ProcessingQrService.GenerateQrPng($"{_baseUrl}/api/members/qrcode/{qrcode}");
+            return File(pngBytes, "image/png", $"qr_{qrcode}.png");
         }
         catch (Exception ex)
         {
