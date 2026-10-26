@@ -85,7 +85,7 @@ public class MemberRepository
         var member = new Member
         {
             Name = dto.Name,
-            Companion = dto.Companion,
+            Companion = dto.Companion ?? string.Empty,
             Contact = dto.Contact,
             MeetGuid = dto.MeetUid,
             Role = Member.MemberRole.Guest,
@@ -105,7 +105,7 @@ public class MemberRepository
             var members = createMeetDto.Members.Select(m => new Member
             {
                 Name = m.Name,
-                Companion = m.Companion,
+                Companion = m.Companion ?? string.Empty,
                 Contact = m.Contact,
                 Role = m.Role ?? Member.MemberRole.Guest,
                 MeetGuid = meet.Uid,

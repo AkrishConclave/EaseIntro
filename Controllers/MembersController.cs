@@ -81,17 +81,73 @@ public class MembersController : ControllerBase
     [EnableRateLimiting("IpRateLimit")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<ResponseMemberDto>> CreateMember([FromBody] CreateMemberDto dto)
     {
         try
         {
-            if (await _memberRepository.CheckExistsContactAsync(dto.Contact, dto.MeetUid)) { return NotFound("Контакт с такой почтой уже зарегистрирован."); }
-            var meet = await _meetRepository.PublicGetMeetByUidOrNullAsync(dto.MeetUid);
-            if (meet == null) { return NotFound("Встречи с указаным идентификатором не найдено."); }
-            var member = await _memberRepository.CreateMember(dto);
-            
-            return Ok($"Это ваш уникальный идентификатор: {member.QrCode}");
+            Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction = null;
+            if (_context.Database.IsRelational())
+            {
+                transaction = await _context.Database.BeginTransactionAsync();
+            }
+
+            try
+            {
+                if (await _memberRepository.CheckExistsContactAsync(dto.Contact, dto.MeetUid))
+                {
+                    return Conflict("Контакт с такой почтой уже зарегистрирован.");
+                }
+
+                var meet = await _meetRepository.PublicGetMeetByUidOrNullAsync(dto.MeetUid);
+                if (meet == null)
+                {
+                    return NotFound("Встречи с указаным идентификатором не найдено.");
+                }
+
+                if (meet.StatusId != 1 && meet.StatusId != 5)
+                {
+                    return BadRequest("Регистрация на данную встречу недоступна.");
+                }
+
+                var meetDateUtc = meet.Date.Kind == DateTimeKind.Utc ? meet.Date : DateTime.SpecifyKind(meet.Date, DateTimeKind.Utc);
+                if (meetDateUtc < DateTime.UtcNow)
+                {
+                    return BadRequest("Срок регистрации на встречу истек.");
+                }
+
+                if (!meet.AllowedPlusOne && !string.IsNullOrWhiteSpace(dto.Companion))
+                {
+                    return BadRequest("На данную встречу нельзя регистрироваться со спутником (+1).");
+                }
+
+                if (meet.LimitMembers > 0 && meet.Members.Count >= meet.LimitMembers)
+                {
+                    return BadRequest("Достигнут лимит участников встречи.");
+                }
+
+                var member = await _memberRepository.CreateMember(dto);
+
+                if (transaction != null)
+                {
+                    await transaction.CommitAsync();
+                }
+
+                return Ok($"Это ваш уникальный идентификатор: {member.QrCode}");
+            }
+            finally
+            {
+                if (transaction != null)
+                {
+                    await transaction.DisposeAsync();
+                }
+            }
+        }
+        catch (DbUpdateException)
+        {
+            return Conflict("Контакт с такой почтой уже зарегистрирован.");
         }
         catch (Exception ex)
         {
