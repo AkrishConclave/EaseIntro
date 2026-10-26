@@ -32,8 +32,29 @@ public static class MeetMapper
         };
     }
 
+    public static PublicResponseMeetDto MapToPublicDto(Meet meet)
+    {
+        var currentMembersCount = meet.Members?.Count ?? 0;
+        int? availableSpots = meet.LimitMembers > 0 ? Math.Max(0, meet.LimitMembers - currentMembersCount) : null;
+
+        return new PublicResponseMeetDto
+        {
+            Uid = meet.Uid,
+            Title = meet.Title,
+            Date = meet.Date,
+            Location = meet.Location,
+            LimitMembers = meet.LimitMembers,
+            AllowedPlusOne = meet.AllowedPlusOne,
+            Owner = MapUserToDto(meet.Owner),
+            Status = meet.Status != null ? MapStatusToDto(meet.Status) : null,
+            CurrentMembersCount = currentMembersCount,
+            AvailableSpots = availableSpots
+        };
+    }
+
     private static ResponseUserDto MapUserToDto(User user)
     {
+        if (user == null) return new ResponseUserDto();
         return new ResponseUserDto
         {
             PublicName = user.PublicName,
@@ -43,6 +64,7 @@ public static class MeetMapper
 
     private static MeetStatusDto MapStatusToDto(MeetStatus status)
     {
+        if (status == null) return new MeetStatusDto();
         return new MeetStatusDto
         {
             Title = status.Title,
