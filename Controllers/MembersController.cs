@@ -217,6 +217,7 @@ public class MembersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> UpdateMember(int id, [FromBody] UpdateMemberDto dto)
     {
         try
@@ -238,6 +239,14 @@ public class MembersController : ControllerBase
 
             if (meet.OwnerId != userId)
                 return Forbid();
+
+            if (!string.IsNullOrWhiteSpace(dto.Contact) && !string.Equals(dto.Contact, member.Contact, StringComparison.OrdinalIgnoreCase))
+            {
+                if (await _memberRepository.CheckExistsContactAsync(dto.Contact, member.MeetGuid))
+                {
+                    return Conflict("Контакт с такой почтой уже зарегистрирован.");
+                }
+            }
             
             await _memberRepository.UpdateMemberAsync(dto, member);
             
