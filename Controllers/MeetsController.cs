@@ -75,20 +75,29 @@ public class MeetsController : ControllerBase
     /// <remarks>
     /// Этот метод возвращает информацию о митинге по его уникальному идентификатору в формате DTO. 
     /// В случае, если митинг с указанным идентификатором не найден, возвращается ошибка 404 NotFound.
+    /// Если запрос не авторизован или пользователь не является владельцем встречи, возвращается PublicResponseMeetDto.
+    /// Если пользователь является владельцем встречи, возвращается полный ResponseMeetDto.
     /// </remarks>
     /// <param name="uid">Уникальный идентификатор митинга (GUID).</param>
-    /// <returns>Возвращает информацию о митинге (MeetResponseDto) или ошибку 404, если митинг не найден.</returns>
+    /// <returns>Возвращает информацию о митинге или ошибку 404, если митинг не найден.</returns>
     [HttpGet("{uid:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<ResponseMeetDto>> GetMeet(Guid uid)
+    public async Task<ActionResult> GetMeet(Guid uid)
     {
         try
         {
             var meet = await _meetRepository.PublicGetMeetByUidOrNullAsync(uid);
             
-            if (meet == null) { return BadRequest("Встречи с указаным идентификатором не найдено."); }
-            return Ok(MeetMapper.MapToDto(meet));
+            if (meet == null) { return NotFound("Встречи с указаным идентификатором не найдено."); }
+
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!string.IsNullOrEmpty(userIdClaim) && int.TryParse(userIdClaim, out var userId) && meet.OwnerId == userId)
+            {
+                return Ok(MeetMapper.MapToDto(meet));
+            }
+
+            return Ok(MeetMapper.MapToPublicDto(meet));
         }
         catch (Exception ex)
         {

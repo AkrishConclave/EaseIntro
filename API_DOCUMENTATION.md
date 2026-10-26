@@ -232,7 +232,7 @@ Authorization: Bearer {your_token}
 ```
 
 **Ошибки:**
-- `400 Bad Request` - Встреча не найдена
+- `404 Not Found` - Встреча не найдена
 
 ---
 
