@@ -34,6 +34,7 @@ public class MembersControllerTests
     {
         var mock = new Mock<IUserContextService>();
         mock.Setup(x => x.UserId).Returns(userId);
+        mock.Setup(x => x.IsAuthenticated).Returns(true);
         return mock;
     }
 
@@ -76,7 +77,7 @@ public class MembersControllerTests
         var loggerMock = new Mock<ILogger<MembersController>>();
         var configMock = new Mock<IConfiguration>();
 
-        var controller = new MembersController(context, loggerMock.Object, memberRepo, memberService, meetRepo, configMock.Object);
+        var controller = new MembersController(context, loggerMock.Object, memberRepo, memberService, meetRepo, configMock.Object, userContextMock.Object);
 
         var dto = new CreateMemberDto
         {
@@ -124,7 +125,7 @@ public class MembersControllerTests
         var loggerMock = new Mock<ILogger<MembersController>>();
         var configMock = new Mock<IConfiguration>();
 
-        var controller = new MembersController(context, loggerMock.Object, memberRepo, memberService, meetRepo, configMock.Object);
+        var controller = new MembersController(context, loggerMock.Object, memberRepo, memberService, meetRepo, configMock.Object, userContextMock.Object);
 
         var dto = new CreateMemberDto
         {
@@ -173,7 +174,7 @@ public class MembersControllerTests
         var loggerMock = new Mock<ILogger<MembersController>>();
         var configMock = new Mock<IConfiguration>();
 
-        var controller = new MembersController(context, loggerMock.Object, memberRepo, memberService, meetRepo, configMock.Object);
+        var controller = new MembersController(context, loggerMock.Object, memberRepo, memberService, meetRepo, configMock.Object, userContextMock.Object);
 
         var dto = new CreateMemberDto
         {
@@ -222,7 +223,7 @@ public class MembersControllerTests
         var loggerMock = new Mock<ILogger<MembersController>>();
         var configMock = new Mock<IConfiguration>();
 
-        var controller = new MembersController(context, loggerMock.Object, memberRepo, memberService, meetRepo, configMock.Object);
+        var controller = new MembersController(context, loggerMock.Object, memberRepo, memberService, meetRepo, configMock.Object, userContextMock.Object);
 
         var dto = new CreateMemberDto
         {
@@ -271,7 +272,7 @@ public class MembersControllerTests
         var loggerMock = new Mock<ILogger<MembersController>>();
         var configMock = new Mock<IConfiguration>();
 
-        var controller = new MembersController(context, loggerMock.Object, memberRepo, memberService, meetRepo, configMock.Object);
+        var controller = new MembersController(context, loggerMock.Object, memberRepo, memberService, meetRepo, configMock.Object, userContextMock.Object);
 
         var dto = new CreateMemberDto
         {
@@ -331,7 +332,7 @@ public class MembersControllerTests
         var loggerMock = new Mock<ILogger<MembersController>>();
         var configMock = new Mock<IConfiguration>();
 
-        var controller = new MembersController(context, loggerMock.Object, memberRepo, memberService, meetRepo, configMock.Object);
+        var controller = new MembersController(context, loggerMock.Object, memberRepo, memberService, meetRepo, configMock.Object, userContextMock.Object);
 
         var dto = new CreateMemberDto
         {
@@ -392,18 +393,7 @@ public class MembersControllerTests
         var loggerMock = new Mock<ILogger<MembersController>>();
         var configMock = new Mock<IConfiguration>();
 
-        var controller = new MembersController(context, loggerMock.Object, memberRepo, memberService, meetRepo, configMock.Object);
-        controller.ControllerContext = new ControllerContext
-        {
-            HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(new ClaimsIdentity(new[]
-                {
-                    new Claim(ClaimTypes.NameIdentifier, "1"),
-                    new Claim(ClaimTypes.Role, "User")
-                }, "TestAuth"))
-            }
-        };
+        var controller = new MembersController(context, loggerMock.Object, memberRepo, memberService, meetRepo, configMock.Object, userContextMock.Object);
 
         var dto = new UpdateMemberDto
         {
@@ -474,18 +464,7 @@ public class MembersControllerTests
         var loggerMock = new Mock<ILogger<MembersController>>();
         var configMock = new Mock<IConfiguration>();
 
-        var controller = new MembersController(context, loggerMock.Object, memberRepo, memberService, meetRepo, configMock.Object);
-        controller.ControllerContext = new ControllerContext
-        {
-            HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(new ClaimsIdentity(new[]
-                {
-                    new Claim(ClaimTypes.NameIdentifier, "1"),
-                    new Claim(ClaimTypes.Role, "User")
-                }, "TestAuth"))
-            }
-        };
+        var controller = new MembersController(context, loggerMock.Object, memberRepo, memberService, meetRepo, configMock.Object, userContextMock.Object);
 
         var dto = new UpdateMemberDto
         {

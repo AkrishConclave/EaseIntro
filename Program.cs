@@ -7,6 +7,7 @@ using ease_intro_api.Data.Repository;
 using ease_intro_api.Core.Services;
 using ease_intro_api.Core.Services.Interfaces;
 using ease_intro_api.Data;
+using ease_intro_api.Helpers;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -30,6 +31,10 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(builder.Configuration.GetConnectionString("DefaultConnection"), 
         ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnection"))));
+
+// Добавляем обработчик исключений
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
 
 // Добавляем контроллеры
 builder.Services.AddControllers();
@@ -127,6 +132,8 @@ builder.Services.AddRateLimiter(options =>
 var app = builder.Build();
 
 app.UseForwardedHeaders();
+
+app.UseExceptionHandler();
 
 // HTTPS редирект
 if (!app.Environment.IsDevelopment())
