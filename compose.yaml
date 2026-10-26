@@ -1,0 +1,56 @@
+name: easeintro
+x-api: &api
+  image: easeintro-api:local
+  build:
+    context: .
+    target: runtime
+  environment: &environment
+    ConnectionStrings__DefaultConnection: "Server=db;Port=3306;Database=easeintro;User=easeintro;Password=${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}"
+    Jwt__Key: ${JWT_KEY:?Set JWT_KEY in .env (at least 32 bytes)}
+    Jwt__Issuer: easeintro
+    Jwt__Audience: easeintro
+    BaseUrl: ${BASE_URL:-http://localhost:8080}
+    HttpsRedirection__Enabled: "false"
+services:
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: easeintro
+      MYSQL_USER: easeintro
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_PASSWORD mysql -h 127.0.0.1 -u easeintro -D easeintro -e 'SELECT 1' >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+  migrate:
+    <<: *api
+    command: ["--migrate"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+  api:
+    <<: *api
+    ports:
+      - "127.0.0.1:${API_PORT:-8080}:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+  tests:
+    profiles: ["test"]
+    build:
+      context: .
+      target: test
+    environment:
+      EASEINTRO_TEST_MYSQL: "Server=db;Database=easeintro;User=root;Password=${MYSQL_ROOT_PASSWORD}"
+    depends_on:
+      db:
+        condition: service_healthy
+volumes:
+  mysql-data:

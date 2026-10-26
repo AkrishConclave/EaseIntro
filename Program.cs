@@ -16,6 +16,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrWhiteSpace(connectionString) || connectionString == "YOUR_CONNECTION_STRING_HERE")
+    throw new InvalidOperationException("Configure ConnectionStrings:DefaultConnection.");
+var jwtKey = builder.Configuration["Jwt:Key"];
+if (string.IsNullOrWhiteSpace(jwtKey) || Encoding.UTF8.GetByteCount(jwtKey) < 32)
+    throw new InvalidOperationException("Jwt:Key must contain at least 32 UTF-8 bytes.");
 
 // Настройка Forwarded Headers для доверенных прокси ( reverse-proxy: 127.0.0.1 / ::1 )
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
@@ -29,8 +35,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 
 // Настройка подключения к базе данных MySQL
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseMySql(builder.Configuration.GetConnectionString("DefaultConnection"), 
-        ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnection"))));
+    options.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 4, 0))));
 
 // Добавляем обработчик исключений
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -131,12 +136,19 @@ builder.Services.AddRateLimiter(options =>
 
 var app = builder.Build();
 
+if (args.Contains("--migrate"))
+{
+    using var scope = app.Services.CreateScope();
+    await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Database.MigrateAsync();
+    return;
+}
+
 app.UseForwardedHeaders();
 
 app.UseExceptionHandler();
 
 // HTTPS редирект
-if (!app.Environment.IsDevelopment())
+if (!app.Environment.IsDevelopment() && builder.Configuration.GetValue("HttpsRedirection:Enabled", true))
 {
     app.UseHttpsRedirection();
 }
@@ -156,6 +168,9 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
+app.MapGet("/health/live", () => Results.Ok(new { status = "ok" }));
+app.MapGet("/health/ready", async (ApplicationDbContext db) =>
+    await db.Database.CanConnectAsync() ? Results.Ok(new { status = "ready" }) : Results.StatusCode(503));
 app.MapControllers();
 
 app.Run();

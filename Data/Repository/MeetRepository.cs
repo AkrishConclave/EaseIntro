@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore.Storage;
 using ease_intro_api.Core.Services.Interfaces;
 using ease_intro_api.DTOs.Meet;
 using ease_intro_api.Models;
@@ -18,6 +19,31 @@ public class MeetRepository
     {
         _context = context;
         _userContextService = userContextService;
+    }
+
+    // All writers that validate capacity or companion rules take this lock first.
+    // ReadCommitted ensures queries after waiting see the preceding writer's commit.
+    public async Task<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction?> LockMeetAsync(Guid uid)
+    {
+        if (!_context.Database.IsRelational()) return null;
+        var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted);
+        try
+        {
+            await using var command = _context.Database.GetDbConnection().CreateCommand();
+            command.Transaction = transaction.GetDbTransaction();
+            command.CommandText = "SELECT `Uid` FROM `Meets` WHERE `Uid` = @uid FOR UPDATE";
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = "@uid";
+            parameter.Value = uid;
+            command.Parameters.Add(parameter);
+            await command.ExecuteScalarAsync();
+            return transaction;
+        }
+        catch
+        {
+            await transaction.DisposeAsync();
+            throw;
+        }
     }
 
     /// <summary>

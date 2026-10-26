@@ -1,3 +1,4 @@
+using ease_intro_api.Helpers;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -55,7 +56,7 @@ public class AuthController : ControllerBase
         {
             await _context.SaveChangesAsync();
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex) when (DatabaseErrors.IsDuplicateKey(ex))
         {
             return Conflict("Такой email уже зарегистрирован.");
         }

@@ -1,4 +1,4 @@
-using System.Security.Claims;
+using ease_intro_api.Helpers;
 using ease_intro_api.Data.Repository;
 using ease_intro_api.Core.Services;
 using ease_intro_api.Core.Services.Interfaces;
@@ -92,7 +92,7 @@ public class MembersController : ControllerBase
     {
         try
         {
-            using var transaction = _context.Database.IsRelational() ? await _context.Database.BeginTransactionAsync() : null;
+            using var transaction = await _meetRepository.LockMeetAsync(dto.MeetUid);
 
             if (await _memberRepository.CheckExistsContactAsync(dto.Contact, dto.MeetUid))
             {
@@ -135,7 +135,7 @@ public class MembersController : ControllerBase
 
             return Ok($"Это ваш уникальный идентификатор: {member.QrCode}");
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex) when (DatabaseErrors.IsDuplicateKey(ex))
         {
             return Conflict("Контакт с такой почтой уже зарегистрирован.");
         }
@@ -201,6 +201,8 @@ public class MembersController : ControllerBase
         if (member == null) { return NotFound("Не найден участник с данным идентификатором в ваших встречах."); }
 
         // Дополнительная проверка владельца (ShowMemberByIdOrNullAsync уже проверяет, но для безопасности оставляем)
+        using var transaction = await _meetRepository.LockMeetAsync(member.MeetGuid);
+        if (_context.Database.IsRelational()) await _context.Entry(member.Meet!).ReloadAsync();
         var meet = await _meetRepository.PublicGetMeetByUidOrNullAsync(member.MeetGuid);
         if (meet == null)
             return NotFound("Встреча не найдена.");
@@ -221,8 +223,15 @@ public class MembersController : ControllerBase
             }
         }
 
-        await _memberRepository.UpdateMemberAsync(dto, member);
-
+        try
+        {
+            await _memberRepository.UpdateMemberAsync(dto, member);
+            if (transaction != null) await transaction.CommitAsync();
+        }
+        catch (DbUpdateException ex) when (DatabaseErrors.IsDuplicateKey(ex))
+        {
+            return Conflict("Контакт с такой почтой уже зарегистрирован.");
+        }
         return NoContent();
     }
     
@@ -268,8 +277,7 @@ public class MembersController : ControllerBase
     /// Этот метод позволяет получить данные о конкретном участнике.
     /// Если участник не найден, будет возвращен соответствующий HTTP-ответ.
     /// Доступно авторизованным пользователям с ролью "User".
-    /// Возвращает билеты пользователя (если contact совпадает с email авторизованного пользователя),
-    /// либо участников встреч, созданных текущим пользователем.
+    /// Возвращает только участников встреч, созданных текущим пользователем.
     /// </remarks>
     /// <param name="contact">Контакт участника, для которого требуется получить информацию.</param>
     /// <returns>
@@ -284,15 +292,8 @@ public class MembersController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetMemberMeets(string contact)
     {
-        var currentUserEmail = _userContextService.User.FindFirst(ClaimTypes.Name)?.Value;
-        var userId = _userContextService.UserId;
-
-        var members = await _memberRepository.GetMemberByContactAsync(contact);
-
-        if (!string.Equals(contact, currentUserEmail, StringComparison.OrdinalIgnoreCase))
-        {
-            members = members.Where(m => m.Meet != null && m.Meet.OwnerId == userId).ToList();
-        }
+        // An unverified account email is not proof of ticket ownership.
+        var members = await _memberRepository.GetMemberByContactAsync(contact, _userContextService.UserId);
 
         var membersDto = members.Select(MemberMapper.MapToDto).ToList();
 
@@ -325,7 +326,7 @@ public class MembersController : ControllerBase
             return NotFound("Встреча не найдена.");
 
         var now = DateTime.UtcNow;
-        var meetDate = meet.Date.ToUniversalTime();
+        var meetDate = DateTime.SpecifyKind(meet.Date, DateTimeKind.Utc);
 
         if (member.IsCheckedIn)
         {
@@ -477,7 +478,7 @@ public class MembersController : ControllerBase
         }
 
         var now = DateTime.UtcNow;
-        var meetDate = meet.Date.ToUniversalTime();
+        var meetDate = DateTime.SpecifyKind(meet.Date, DateTimeKind.Utc);
 
         bool canCheckIn = false;
         string message;
@@ -527,7 +528,8 @@ public class MembersController : ControllerBase
 
         if (canCheckIn)
         {
-            await _memberRepository.CheckInMemberAsync(member);
+            var checkedIn = await _memberRepository.CheckInMemberAsync(member);
+            if (!checkedIn) message = "QR-код уже использован. Участник был отмечен ранее.";
             member = await _memberRepository.GetMemberByQrCodeOrNullAsync(qrcode);
         }
 
@@ -546,7 +548,7 @@ public class MembersController : ControllerBase
                 date = meet.Date,
                 location = meet.Location
             },
-            qrValid = !canCheckIn && !member.IsCheckedIn,
+            qrValid = false,
             message = message,
             checkedInAt = member.IsCheckedIn ? member.CheckedInAt : null,
             isCheckedIn = member.IsCheckedIn
