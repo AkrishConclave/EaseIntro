@@ -448,7 +448,27 @@
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "members", "qrcode", "{{qrCode}}"]
 						},
-						"description": "Сканировать QR-код участника для отметки посещения (публичный endpoint, можно просто камерой). Автоматически проверяет время мероприятия и отмечает участника, если время подходящее. Если указано время - можно сканировать за 3 часа до начала. Если только дата - можно в день мероприятия."
+						"description": "Идемпотентный предпросмотр статуса QR-кода участника (публичный endpoint). Проверяет валидность и время мероприятия без изменения статуса isCheckedIn."
+					},
+					"response": []
+				},
+				{
+					"name": "Check-In Member QR Code",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/members/qrcode/{{qrCode}}/check-in",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "members", "qrcode", "{{qrCode}}", "check-in"]
+						},
+						"description": "Фиксация прохода участника по QR-коду (Check-In). Устанавливает IsCheckedIn = true. Доступно только владельцу встречи."
 					},
 					"response": []
 				},
