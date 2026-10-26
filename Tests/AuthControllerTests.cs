@@ -105,7 +105,7 @@ public class AuthControllerTests
     }
 
     [Fact]
-    public async Task Register_DbUpdateException_Returns409Conflict()
+    public async Task Register_UnrelatedDbUpdateException_IsNotReportedAsDuplicate()
     {
         var dbName = Guid.NewGuid().ToString();
         using var context = GetThrowingDbContext(dbName);
@@ -120,10 +120,7 @@ public class AuthControllerTests
             PublicContact = "concurrent@example.com"
         };
 
-        var result = await controller.Register(dto);
-
-        var conflictResult = Assert.IsType<ConflictObjectResult>(result);
-        Assert.Equal("Такой email уже зарегистрирован.", conflictResult.Value);
+        await Assert.ThrowsAsync<DbUpdateException>(() => controller.Register(dto));
     }
 
     [Fact]

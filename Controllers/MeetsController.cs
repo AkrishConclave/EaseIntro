@@ -183,6 +183,7 @@ public class MeetsController : ControllerBase
     {
         try
         {
+            using var transaction = await _meetRepository.LockMeetAsync(uid);
             var meet = await _meetRepository.GetMeetByUidOrNullAsync(uid);
             if (meet == null) { return NotFound("Встречи с указаным идентификатором не найдено."); }
             
@@ -207,6 +208,7 @@ public class MeetsController : ControllerBase
             }
             
             await _meetRepository.UpdateMeetAsync(updateMeetDto, meet);
+            if (transaction != null) await transaction.CommitAsync();
             
             return NoContent();
         }

@@ -57,10 +57,10 @@ public class MemberRepository
     /// <returns>Возвращает найденого участника.</returns>
     /// <exception cref="InvalidOperationException">Если сработает исключение, пользователь увидет -<br/>
     /// <i>'Status 500, internal server error'</i></exception>
-    public async Task<List<Member>> GetMemberByContactAsync(string contact)
+    public async Task<List<Member>> GetMemberByContactAsync(string contact, int ownerId)
     {
         return await GetMembersQuery()
-            .Where(x => x.Contact == contact)
+            .Where(x => x.Contact == contact && x.Meet!.OwnerId == ownerId)
             .ToListAsync();
     }
     
@@ -143,11 +143,23 @@ public class MemberRepository
     /// </summary>
     /// <param name="member">Участник для отметки</param>
     /// <returns>Обновленный участник</returns>
-    public async Task<Member> CheckInMemberAsync(Member member)
+    public async Task<bool> CheckInMemberAsync(Member member)
     {
+        var now = DateTime.UtcNow;
+        if (_context.Database.IsRelational())
+        {
+            var changed = await _context.Member
+                .Where(m => m.Id == member.Id && !m.IsCheckedIn)
+                .ExecuteUpdateAsync(update => update
+                    .SetProperty(m => m.IsCheckedIn, true)
+                    .SetProperty(m => m.CheckedInAt, (DateTime?)now));
+            await _context.Entry(member).ReloadAsync();
+            return changed == 1;
+        }
+        if (member.IsCheckedIn) return false;
         member.IsCheckedIn = true;
-        member.CheckedInAt = DateTime.UtcNow;
+        member.CheckedInAt = now;
         await _context.SaveChangesAsync();
-        return member;
+        return true;
     }
 }

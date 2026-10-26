@@ -1,0 +1,11 @@
+.git
+**/bin
+**/obj
+**/TestResults
+.env
+.env.*
+!.env.example
+appsettings.Development.json
+**/.DS_Store
+
+**/__pycache__/
