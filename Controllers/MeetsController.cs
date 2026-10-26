@@ -200,6 +200,11 @@ public class MeetsController : ControllerBase
             {
                 return BadRequest("Новый лимит меньше текущего количества зарегистрированных участников.");
             }
+
+            if (!updateMeetDto.AllowedPlusOne && meet.Members.Any(m => !string.IsNullOrWhiteSpace(m.Companion)))
+            {
+                return BadRequest("Нельзя запретить спутников (+1), так как уже есть участники, зарегистрированные со спутником.");
+            }
             
             await _meetRepository.UpdateMeetAsync(updateMeetDto, meet);
             

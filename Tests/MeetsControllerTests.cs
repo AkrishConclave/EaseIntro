@@ -233,4 +233,57 @@ public class MeetsControllerTests
         var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal("Новый лимит меньше текущего количества зарегистрированных участников.", badRequestResult.Value);
     }
+
+    [Fact]
+    public async Task UpdateMeet_DisallowingPlusOneWhenMembersHaveCompanion_Returns400BadRequest()
+    {
+        var dbName = Guid.NewGuid().ToString();
+        using var context = GetDbContext(dbName);
+
+        context.Users.Add(CreateOwnerUser());
+        var status = new MeetStatus { Id = 1, Title = "Запланировано" };
+        context.MeetStatus.Add(status);
+
+        var meetUid = Guid.NewGuid();
+        var meet = new Meet
+        {
+            Uid = meetUid,
+            Title = "Test Meet",
+            Date = DateTime.UtcNow.AddDays(1),
+            Location = "Test Room",
+            StatusId = 1,
+            Status = status,
+            LimitMembers = 10,
+            AllowedPlusOne = true,
+            OwnerId = 1
+        };
+        context.Meets.Add(meet);
+
+        var member1 = new Member { Name = "M1", Contact = "m1@test.com", MeetGuid = meetUid, QrCode = "QR1", Companion = "Companion 1" };
+        context.Member.Add(member1);
+        await context.SaveChangesAsync();
+
+        var userContextMock = GetUserContextMock(1);
+        var meetRepo = new MeetRepository(context, userContextMock.Object);
+        var memberRepo = new MemberRepository(context);
+        var meetService = new MeetService(meetRepo, userContextMock.Object);
+        var loggerMock = new Mock<ILogger<MeetsController>>();
+
+        var controller = new MeetsController(context, loggerMock.Object, meetService, meetRepo, memberRepo, userContextMock.Object);
+
+        var updateDto = new UpdateMeetDto
+        {
+            Title = "Test Meet Updated",
+            Date = DateTime.UtcNow.AddDays(1),
+            Location = "Test Room",
+            StatusId = 1,
+            LimitMembers = 10,
+            AllowedPlusOne = false
+        };
+
+        var result = await controller.UpdateMeet(meetUid, updateDto);
+
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal("Нельзя запретить спутников (+1), так как уже есть участники, зарегистрированные со спутником.", badRequestResult.Value);
+    }
 }
