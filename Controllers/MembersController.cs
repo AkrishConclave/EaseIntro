@@ -2,6 +2,7 @@ using System.Security.Claims;
 using ease_intro_api.Data.Repository;
 using ease_intro_api.Core.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using ease_intro_api.Data;
 using ease_intro_api.DTOs.Member;
 using Microsoft.AspNetCore.Authorization;
@@ -77,6 +78,7 @@ public class MembersController : ControllerBase
     /// <exception cref="ArgumentNullException">Если DTO равен null.</exception>
     /// <seealso cref="GetQrImage(string)"/>
     [HttpPost]
+    [EnableRateLimiting("IpRateLimit")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]

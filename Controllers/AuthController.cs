@@ -5,6 +5,7 @@ using ease_intro_api.Data;
 using ease_intro_api.DTOs.User;
 using ease_intro_api.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
@@ -12,6 +13,7 @@ namespace ease_intro_api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[EnableRateLimiting("IpRateLimit")]
 public class AuthController : ControllerBase
 {
     private readonly IConfiguration _config;
