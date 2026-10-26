@@ -237,6 +237,11 @@ public class MeetsController : ControllerBase
             {
                 return BadRequest("Нельзя установить дату встречи в прошлом.");
             }
+
+            if (updateMeetDto.LimitMembers > 0 && updateMeetDto.LimitMembers < meet.Members.Count)
+            {
+                return BadRequest("Новый лимит меньше текущего количества зарегистрированных участников.");
+            }
             
             await _meetRepository.UpdateMeetAsync(updateMeetDto, meet);
             

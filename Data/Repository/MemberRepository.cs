@@ -119,10 +119,10 @@ public class MemberRepository
 
     public async Task UpdateMemberAsync(UpdateMemberDto dto, Member member)
     {
-        member.Name = dto.Name;
-        member.Companion = dto.Companion;
-        member.Contact = dto.Contact;
-        member.Role = (Member.MemberRole)dto.Role!.Value;
+        if (!string.IsNullOrWhiteSpace(dto.Name)) member.Name = dto.Name;
+        if (dto.Companion != null) member.Companion = dto.Companion;
+        if (!string.IsNullOrWhiteSpace(dto.Contact)) member.Contact = dto.Contact;
+        if (dto.Role.HasValue) member.Role = (Member.MemberRole)dto.Role.Value;
         
         await _context.SaveChangesAsync();
     }

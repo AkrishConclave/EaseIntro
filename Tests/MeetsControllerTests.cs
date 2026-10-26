@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 using ease_intro_api.Controllers;
 using ease_intro_api.Data;
 using ease_intro_api.Data.Repository;
@@ -175,5 +177,70 @@ public class MeetsControllerTests
         var result = Validator.TryValidateObject(dto, validationContext, validationResults, true);
 
         Assert.Equal(isValid, result);
+    }
+
+    [Fact]
+    public async Task UpdateMeet_LimitMembersLessThanCurrentMemberCount_Returns400BadRequest()
+    {
+        var dbName = Guid.NewGuid().ToString();
+        using var context = GetDbContext(dbName);
+
+        context.Users.Add(CreateOwnerUser());
+        var status = new MeetStatus { Id = 1, Title = "Запланировано" };
+        context.MeetStatus.Add(status);
+
+        var meetUid = Guid.NewGuid();
+        var meet = new Meet
+        {
+            Uid = meetUid,
+            Title = "Test Meet",
+            Date = DateTime.UtcNow.AddDays(1),
+            Location = "Test Room",
+            StatusId = 1,
+            Status = status,
+            LimitMembers = 10,
+            AllowedPlusOne = true,
+            OwnerId = 1
+        };
+        context.Meets.Add(meet);
+
+        var member1 = new Member { Name = "M1", Contact = "m1@test.com", MeetGuid = meetUid, QrCode = "QR1" };
+        var member2 = new Member { Name = "M2", Contact = "m2@test.com", MeetGuid = meetUid, QrCode = "QR2" };
+        context.Member.AddRange(member1, member2);
+        await context.SaveChangesAsync();
+
+        var userContextMock = GetUserContextMock(1);
+        var meetRepo = new MeetRepository(context, userContextMock.Object);
+        var memberRepo = new MemberRepository(context);
+        var meetService = new MeetService(meetRepo, userContextMock.Object);
+        var loggerMock = new Mock<ILogger<MeetsController>>();
+
+        var controller = new MeetsController(context, loggerMock.Object, meetService, meetRepo, memberRepo);
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, "1"),
+                    new Claim(ClaimTypes.Role, "User")
+                }, "TestAuth"))
+            }
+        };
+
+        var updateDto = new UpdateMeetDto
+        {
+            Title = "Test Meet Updated",
+            Date = DateTime.UtcNow.AddDays(1),
+            Location = "Test Room",
+            StatusId = 1,
+            LimitMembers = 1, // 1 < 2 registered members
+            AllowedPlusOne = true
+        };
+
+        var result = await controller.UpdateMeet(meetUid, updateDto);
+
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal("Новый лимит меньше текущего количества зарегистрированных участников.", badRequestResult.Value);
     }
 }
