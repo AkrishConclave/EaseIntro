@@ -368,8 +368,15 @@ public class MeetsController : ControllerBase
             
             foreach (var member in checkedInMembers)
             {
+                var name = member.Name ?? string.Empty;
+                name = name.Replace("\"", "\"\"");
+                if (name.Length > 0 && (name[0] == '=' || name[0] == '+' || name[0] == '-' || name[0] == '@' || name[0] == '\t' || name[0] == '\r'))
+                {
+                    name = "'" + name;
+                }
+
                 var dateStr = member.CheckedInAt!.Value.ToString("yyyy-MM-dd HH:mm:ss");
-                csvLines.Add($"\"{member.Name}\",\"{dateStr}\"");
+                csvLines.Add($"\"{name}\",\"{dateStr}\"");
             }
             
             var csvContent = string.Join("\n", csvLines);

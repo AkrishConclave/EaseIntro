@@ -7,11 +7,24 @@ using ease_intro_api.Data.Repository;
 using ease_intro_api.Core.Services;
 using ease_intro_api.Core.Services.Interfaces;
 using ease_intro_api.Data;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Настройка Forwarded Headers для доверенных прокси ( reverse-proxy: 127.0.0.1 / ::1 )
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownProxies.Clear();
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Add(System.Net.IPAddress.Parse("127.0.0.1"));
+    options.KnownProxies.Add(System.Net.IPAddress.IPv6Loopback);
+});
 
 // Настройка подключения к базе данных MySQL
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -90,7 +103,30 @@ builder.Services.AddCors(options =>
     });
 });
 
+// Настройка встроенного Rate Limiter с FixedWindowLimiter по IP
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, token) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        context.HttpContext.Response.ContentType = "application/json";
+        await context.HttpContext.Response.WriteAsync("{\"error\":\"Слишком много запросов. Попробуйте позже.\"}", token);
+    };
+    options.AddPolicy("IpRateLimit", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+});
+
 var app = builder.Build();
+
+app.UseForwardedHeaders();
 
 // HTTPS редирект
 if (!app.Environment.IsDevelopment())
@@ -108,8 +144,7 @@ if (app.Environment.IsDevelopment())
 // CORS должен быть до Authentication
 app.UseCors();
 
-// Rate limiting для auth endpoints
-app.UseMiddleware<ease_intro_api.Middleware.RateLimitMiddleware>();
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();
