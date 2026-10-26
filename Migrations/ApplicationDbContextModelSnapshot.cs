@@ -197,12 +197,10 @@ namespace ease_intro_api.Migrations
                         .HasMaxLength(160)
                         .HasColumnType("varchar(160)");
 
-                    b.Property<int?>("UserId")
-                        .HasColumnType("int");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserEmail")
+                        .IsUnique();
 
                     b.ToTable("Users");
                 });
@@ -210,7 +208,7 @@ namespace ease_intro_api.Migrations
             modelBuilder.Entity("ease_intro_api.Models.Meet", b =>
                 {
                     b.HasOne("ease_intro_api.Models.User", "Owner")
-                        .WithMany()
+                        .WithMany("Meets")
                         .HasForeignKey("OwnerId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -237,13 +235,6 @@ namespace ease_intro_api.Migrations
                     b.Navigation("Meet");
                 });
 
-            modelBuilder.Entity("ease_intro_api.Models.User", b =>
-                {
-                    b.HasOne("ease_intro_api.Models.User", null)
-                        .WithMany("Users")
-                        .HasForeignKey("UserId");
-                });
-
             modelBuilder.Entity("ease_intro_api.Models.Meet", b =>
                 {
                     b.Navigation("Members");
@@ -256,7 +247,7 @@ namespace ease_intro_api.Migrations
 
             modelBuilder.Entity("ease_intro_api.Models.User", b =>
                 {
-                    b.Navigation("Users");
+                    b.Navigation("Meets");
                 });
 #pragma warning restore 612, 618
         }
