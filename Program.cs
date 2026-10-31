@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------------------------
 
 using System.Text;
+using System.Net;
 using ease_intro_api.Data.Repository;
 using ease_intro_api.Core.Services;
 using ease_intro_api.Core.Services.Interfaces;
@@ -23,14 +24,57 @@ var jwtKey = builder.Configuration["Jwt:Key"];
 if (string.IsNullOrWhiteSpace(jwtKey) || Encoding.UTF8.GetByteCount(jwtKey) < 32)
     throw new InvalidOperationException("Jwt:Key must contain at least 32 UTF-8 bytes.");
 
-// Настройка Forwarded Headers для доверенных прокси ( reverse-proxy: 127.0.0.1 / ::1 )
+var configuredKnownProxies = builder.Configuration
+    .GetSection("ForwardedHeaders:KnownProxies")
+    .GetChildren()
+    .Select(item => item.Value)
+    .Where(value => !string.IsNullOrWhiteSpace(value))
+    .Cast<string>()
+    .ToArray();
+
+var configuredKnownNetworks = builder.Configuration
+    .GetSection("ForwardedHeaders:KnownNetworks")
+    .GetChildren()
+    .Select(item => item.Value)
+    .Where(value => !string.IsNullOrWhiteSpace(value))
+    .Cast<string>()
+    .ToArray();
+
+// По умолчанию доверяем только loopback. Дополнительные proxy и сети должны
+// быть явно заданы конфигурацией среды выполнения.
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.ForwardLimit = 1;
     options.KnownProxies.Clear();
     options.KnownNetworks.Clear();
     options.KnownProxies.Add(System.Net.IPAddress.Parse("127.0.0.1"));
     options.KnownProxies.Add(System.Net.IPAddress.IPv6Loopback);
+
+    foreach (var proxyValue in configuredKnownProxies)
+    {
+        if (!IPAddress.TryParse(proxyValue, out var proxyAddress))
+            throw new InvalidOperationException($"Некорректный доверенный proxy-адрес: {proxyValue}");
+
+        options.KnownProxies.Add(proxyAddress);
+    }
+
+    foreach (var networkValue in configuredKnownNetworks)
+    {
+        var parts = networkValue.Split('/', 2, StringSplitOptions.TrimEntries);
+        if (parts.Length != 2 ||
+            !IPAddress.TryParse(parts[0], out var prefix) ||
+            !int.TryParse(parts[1], out var prefixLength))
+        {
+            throw new InvalidOperationException($"Некорректная доверенная proxy-сеть: {networkValue}");
+        }
+
+        var maximumPrefixLength = prefix.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork ? 32 : 128;
+        if (prefixLength < 0 || prefixLength > maximumPrefixLength)
+            throw new InvalidOperationException($"Некорректная длина префикса proxy-сети: {networkValue}");
+
+        options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(prefix, prefixLength));
+    }
 });
 
 // Настройка подключения к базе данных MySQL

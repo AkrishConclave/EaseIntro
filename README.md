@@ -166,9 +166,18 @@ Compose запускает MySQL 8.4, ждёт его готовности, пр
 
 Для публичного сервера используйте HTTPS reverse proxy и задайте внешний HTTPS
 `BASE_URL`. В Compose HTTPS-редирект API отключён, TLS должен завершаться на прокси.
-Доверенные forwarded headers сейчас принимаются только от loopback; при отдельном
-контейнере прокси настройте его конкретный доверенный IP в `Program.cs` (не доверяйте
-произвольному `X-Forwarded-For`). Без этого rate limit будет учитывать IP прокси.
+Доверенные forwarded headers по умолчанию принимаются только от loopback. При
+отдельном контейнере reverse proxy передайте его адрес или сеть через конфигурацию:
+
+```bash
+ForwardedHeaders__KnownProxies__0=172.30.0.2
+# либо сеть, выделенная только для reverse proxy и приложений
+ForwardedHeaders__KnownNetworks__0=172.30.0.0/24
+```
+
+Не доверяйте произвольным сетям и не публикуйте порт API напрямую. Приложение
+принимает только один набор forwarded headers (`ForwardLimit = 1`), поэтому
+rate limit использует IP клиента, полученный от доверенного proxy.
 Swagger включён только в Development. Проверки состояния: `/health/live` и
 `/health/ready` (подключение к БД). Секреты `.env` не входят в Git и Docker-образ.
 
